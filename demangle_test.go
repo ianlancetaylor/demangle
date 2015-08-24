@@ -123,6 +123,10 @@ func TestDemangler(t *testing.T) {
 			"_Z1fIXadL_Z1hvEEEvv",
 			"void f<&h>()",
 		},
+		{
+			"_Z1CIP1DEiRK1EPT_N1F1GIS5_Xaasr1HIS5_E1IntsrSA_1JEE1KE",
+			"int C<D*>(E const&, D**, F::G<D*, H<D*>::I&&(!H<D*>::J)>::K)",
+		},
 	}
 
 	for _, test := range tests {

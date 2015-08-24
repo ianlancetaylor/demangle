@@ -647,6 +647,9 @@ func (st *state) number() int {
 		neg = true
 		st.advance(1)
 	}
+	if len(st.str) == 0 || !isDigit(st.str[0]) {
+		st.fail("missing number")
+	}
 	val := 0
 	for len(st.str) > 0 && isDigit(st.str[0]) {
 		// Number picked to ensure we can't overflow with 32-bit int.
@@ -1273,7 +1276,10 @@ func (st *state) demangleType(isCast bool) AST {
 				_ = st.number()
 			}
 			base := st.demangleType(isCast)
-			_ = st.number()
+			if len(st.str) > 0 && isDigit(st.str[0]) {
+				// We don't care about the bits.
+				st.number()
+			}
 			sat := false
 			if len(st.str) > 0 {
 				if st.str[0] == 's' {
@@ -1706,7 +1712,12 @@ func (st *state) expression() AST {
 		case 'T', 'D', 'S':
 			t := st.demangleType(false)
 			n := st.unqualifiedName()
-			return &Qualified{Scope: t, Name: n, LocalName: false}
+			n = &Qualified{Scope: t, Name: n, LocalName: false}
+			if len(st.str) > 0 && st.str[0] == 'I' {
+				args := st.templateArgs()
+				n = &Template{Name: n, Args: args}
+			}
+			return n
 		default:
 			var s AST
 			if st.str[0] == 'N' {
@@ -1714,6 +1725,20 @@ func (st *state) expression() AST {
 				s = st.demangleType(false)
 			}
 			for len(st.str) == 0 || st.str[0] != 'E' {
+				// GCC does not seem to follow the ABI here.
+				// It can emit type/name without an 'E'.
+				if s != nil && len(st.str) > 0 && !isDigit(st.str[0]) {
+					if q, ok := s.(*Qualified); ok {
+						a := q.Scope
+						if t, ok := a.(*Template); ok {
+							st.subs.add(t.Name)
+							st.subs.add(t)
+						} else {
+							st.subs.add(a)
+						}
+						return s
+					}
+				}
 				n := st.sourceName()
 				if len(st.str) > 0 && st.str[0] == 'I' {
 					args := st.templateArgs()
