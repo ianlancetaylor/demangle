@@ -33,14 +33,24 @@ type AST interface {
 }
 
 // ASTToString returns the demangled name of the AST.
-func ASTToString(a AST) string {
-	var ps printState
+func ASTToString(a AST, options ...Option) string {
+	tparams := true
+	for _, o := range options {
+		switch o {
+		case NoTemplateParams:
+			tparams = false
+		}
+	}
+
+	ps := printState{tparams: tparams}
 	a.print(&ps)
 	return ps.buf.String()
 }
 
 // The printState type holds information needed to print an AST.
 type printState struct {
+	tparams bool // whether to print template parameters
+
 	buf  bytes.Buffer
 	last byte // Last byte written to buffer.
 
@@ -234,6 +244,10 @@ func (t *Template) print(ps *printState) {
 	ps.inner = nil
 	t.Name.print(ps)
 
+	if !ps.tparams {
+		// Do not print template parameters.
+		return
+	}
 	// We need an extra space after operator<.
 	if ps.last == '<' {
 		ps.writeByte(' ')

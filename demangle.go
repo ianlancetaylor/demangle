@@ -24,6 +24,13 @@ const (
 	// The NoParams option disables demangling of function parameters.
 	NoParams Option = iota
 
+	// The NoTemplateParams option disables demangling of template parameters.
+	NoTemplateParams
+
+	// The NoClones option disables inclusion of clone suffixes.
+	// NoParams implies NoClones.
+	NoClones
+
 	// The Verbose option turns on more verbose demangling.
 	Verbose
 )
@@ -47,7 +54,7 @@ func ToString(name string, options ...Option) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return ASTToString(a), nil
+	return ASTToString(a, options...), nil
 }
 
 // ToAST demangles a C++ symbol name into an abstract syntax tree
@@ -134,11 +141,17 @@ func doDemangle(name string, options ...Option) (ret AST, err error) {
 	}()
 
 	params := true
+	clones := true
 	verbose := false
 	for _, o := range options {
 		switch o {
 		case NoParams:
 			params = false
+			clones = false
+		case NoTemplateParams:
+		// This is a valid option but only affect printing of the AST.
+		case NoClones:
+			clones = false
 		case Verbose:
 			verbose = true
 		default:
@@ -150,13 +163,13 @@ func doDemangle(name string, options ...Option) (ret AST, err error) {
 	a := st.encoding(params)
 
 	// Accept a clone suffix.
-	if params {
+	if clones {
 		for len(st.str) > 1 && st.str[0] == '.' && (isLower(st.str[1]) || st.str[1] == '_' || isDigit(st.str[1])) {
 			a = st.cloneSuffix(a)
 		}
 	}
 
-	if params && len(st.str) > 0 {
+	if clones && len(st.str) > 0 {
 		st.fail("unparsed characters at end of mangled name")
 	}
 
