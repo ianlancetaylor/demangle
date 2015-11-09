@@ -1375,6 +1375,9 @@ func (st *state) cvQualifiers() Qualifiers {
 		if qv, ok := qualifiers[st.str[0]]; ok {
 			q = append([]string{qv}, q...)
 			st.advance(1)
+		} else if len(st.str) > 1 && st.str[:2] == "Dx" {
+			q = append([]string{"transaction_safe"}, q...)
+			st.advance(2)
 		} else {
 			break
 		}
