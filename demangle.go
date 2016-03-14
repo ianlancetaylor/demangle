@@ -1176,14 +1176,26 @@ func (st *state) demangleType(isCast bool) AST {
 			ret = &ImaginaryType{Base: t}
 		}
 	case 'U':
-		st.advance(1)
-		n := st.sourceName()
-		if len(st.str) > 0 && st.str[0] == 'I' {
-			args := st.templateArgs()
-			n = &Template{Name: n, Args: args}
+		if len(st.str) < 2 {
+			st.fail("expected source name or unnamed type")
 		}
-		t := st.demangleType(isCast)
-		ret = &VendorQualifier{Qualifier: n, Type: t}
+		switch st.str[1] {
+		case 'l':
+			ret = st.closureTypeName()
+			addSubst = false
+		case 't':
+			ret = st.unnamedTypeName()
+			addSubst = false
+		default:
+			st.advance(1)
+			n := st.sourceName()
+			if len(st.str) > 0 && st.str[0] == 'I' {
+				args := st.templateArgs()
+				n = &Template{Name: n, Args: args}
+			}
+			t := st.demangleType(isCast)
+			ret = &VendorQualifier{Qualifier: n, Type: t}
+		}
 	case 'D':
 		st.advance(1)
 		if len(st.str) == 0 {
@@ -1739,7 +1751,7 @@ func (st *state) expression() AST {
 		switch st.str[0] {
 		case 'T', 'D', 'S':
 			t := st.demangleType(false)
-			n := st.unqualifiedName()
+			n := st.baseUnresolvedName()
 			n = &Qualified{Scope: t, Name: n, LocalName: false}
 			if len(st.str) > 0 && st.str[0] == 'I' {
 				args := st.templateArgs()
@@ -1769,6 +1781,7 @@ func (st *state) expression() AST {
 				}
 				n := st.sourceName()
 				if len(st.str) > 0 && st.str[0] == 'I' {
+					st.subs.add(s)
 					args := st.templateArgs()
 					n = &Template{Name: n, Args: args}
 				}
@@ -1777,17 +1790,13 @@ func (st *state) expression() AST {
 				} else {
 					s = &Qualified{Scope: s, Name: n, LocalName: false}
 				}
+				st.subs.add(s)
 			}
 			if s == nil {
 				st.fail("missing scope in unresolved name")
 			}
 			st.advance(1)
-			// TODO(iant): Handle "on" and "dn".
-			n := st.sourceName()
-			if len(st.str) > 0 && st.str[0] == 'I' {
-				args := st.templateArgs()
-				n = &Template{Name: n, Args: args}
-			}
+			n := st.baseUnresolvedName()
 			return &Qualified{Scope: s, Name: n, LocalName: false}
 		}
 	} else if st.str[0] == 's' && len(st.str) > 1 && st.str[1] == 'p' {
@@ -1913,6 +1922,40 @@ func (st *state) expression() AST {
 			panic("not reached")
 		}
 	}
+}
+
+// <base-unresolved-name> ::= <simple-id>
+//                        ::= on <operator-name>
+//                        ::= on <operator-name> <template-args>
+//                        ::= dn <destructor-name>
+//
+//<simple-id> ::= <source-name> [ <template-args> ]
+func (st *state) baseUnresolvedName() AST {
+	var n AST
+	if len(st.str) >= 2 && st.str[:2] == "on" {
+		st.advance(2)
+		n, _ = st.operatorName(true)
+	} else if len(st.str) >= 2 && st.str[:2] == "dn" {
+		st.advance(2)
+		if len(st.str) > 0 && isDigit(st.str[0]) {
+			n = st.sourceName()
+		} else {
+			n = st.demangleType(false)
+		}
+		n = &Destructor{Name: n}
+	} else if len(st.str) > 0 && isDigit(st.str[0]) {
+		n = st.sourceName()
+	} else {
+		// GCC seems to not follow the ABI here: it can have
+		// an operator name without on.
+		// See https://gcc.gnu.org/PR70182.
+		n, _ = st.operatorName(true)
+	}
+	if len(st.str) > 0 && st.str[0] == 'I' {
+		args := st.templateArgs()
+		n = &Template{Name: n, Args: args}
+	}
+	return n
 }
 
 // <expr-primary> ::= L <type> <(value) number> E

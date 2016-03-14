@@ -218,6 +218,20 @@ func TestDemangler(t *testing.T) {
 			"A::B::C::D::operator K*() &&",
 			"A::B::C::D::operator K*",
 		},
+		{
+			"_ZNSt1AIFSt1BImjEjEZN1C1DI1EEENSt1FIXeqsr1G1H1IIDTadsrT_onclEEE1JLi2EEvE1KEPKcSC_OS7_EUljE_E1KERKSt1Lj",
+			"std::A<std::B<unsigned long, unsigned int> (unsigned int), std::F<G::H::I<decltype (&E::operator())>::J==(2), void>::K C::D<E>(char const*, G::H::I<decltype (&E::operator())>, G&&)::{lambda(unsigned int)#1}>::K(std::L const&, unsigned int)",
+			"std::A<std::B<unsigned long, unsigned int> (unsigned int), std::F<G::H::I<decltype (&E::operator())>::J==(2), void>::K C::D<E>(char const*, G::H::I<decltype (&E::operator())>, G&&)::{lambda(unsigned int)#1}>::K",
+			"std::A::K(std::L const&, unsigned int)",
+			"std::A::K",
+		},
+		{
+			"_ZNSt1AIFSt1BImjEjEZN1L1CIUljE_EENSt1DIXeqsrN1E1F1GIDTadsrT_clEEE1HLi2EEvE1IEPKcSG_OSA_EUljE_E1JERKSt1Kj",
+			"std::A<std::B<unsigned long, unsigned int> (unsigned int), std::D<E::F::G<decltype (&{lambda(unsigned int)#1}::operator())>::H==(2), void>::I L::C<{lambda(unsigned int)#1}>(char const*, char const*, {lambda(unsigned int)#1}&&)::{lambda(unsigned int)#1}>::J(std::K const&, unsigned int)",
+			"std::A<std::B<unsigned long, unsigned int> (unsigned int), std::D<E::F::G<decltype (&{lambda(unsigned int)#1}::operator())>::H==(2), void>::I L::C<{lambda(unsigned int)#1}>(char const*, char const*, {lambda(unsigned int)#1}&&)::{lambda(unsigned int)#1}>::J",
+			"std::A::J(std::K const&, unsigned int)",
+			"std::A::J",
+		},
 	}
 
 	for _, test := range tests {
