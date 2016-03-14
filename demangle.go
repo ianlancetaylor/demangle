@@ -1067,42 +1067,6 @@ var builtinTypes = map[byte]string{
 //
 // <builtin-type> ::= various one letter codes
 //                ::= u <source-name>
-//
-// The isCast parameter is for a rather hideous parse.  When we see a
-// tempate-param followed by a template-args, we need to decide
-// whether we have a template-param or a template-template-param.
-// Normally it is template-template-param, meaning that we pick up the
-// template arguments here.  But, if we are parsing the type for a
-// cast operator, then the only way this can be
-// template-template-param is if there is another set of template-args
-// immediately after this set.  That would look like this:
-//
-// <nested-name>
-// -> <template-prefix> <template-args>
-// -> <prefix> <template-unqualified-name> <template-args>
-// -> <unqualified-name> <template-unqualified-name> <template-args>
-// -> <source-name> <template-unqualified-name> <template-args>
-// -> <source-name> <operator-name> <template-args>
-// -> <source-name> cv <type> <template-args>
-// -> <source-name> cv <template-template-param> <template-args> <template-args>
-//
-// Otherwise, we have this derivation:
-//
-// <nested-name>
-// -> <template-prefix> <template-args>
-// -> <prefix> <template-unqualified-name> <template-args>
-// -> <unqualified-name> <template-unqualified-name> <template-args>
-// -> <source-name> <template-unqualified-name> <template-args>
-// -> <source-name> <operator-name> <template-args>
-// -> <source-name> cv <type> <template-args>
-// -> <source-name> cv <template-param> <template-args>
-//
-// in which the template-args are actually part of the prefix.  For
-// the special case where this arises, we pass in isCast as true.
-// This function is then responsible for checking whether we see
-// <template-param> <template-args> but there is not another following
-// <template-args>.  In that case, we reset the parse and just return
-// the <template-param>.
 func (st *state) demangleType(isCast bool) AST {
 	if len(st.str) == 0 {
 		st.fail("expected type")
@@ -1160,34 +1124,7 @@ func (st *state) demangleType(isCast bool) AST {
 				args := st.templateArgs()
 				ret = &Template{Name: ret, Args: args}
 			} else {
-				save := st.copy()
-
-				var args []AST
-				failed := false
-				func() {
-					defer func() {
-						if r := recover(); r != nil {
-							if _, ok := r.(demangleErr); ok {
-								failed = true
-							} else {
-								panic(r)
-							}
-						}
-					}()
-
-					args = st.templateArgs()
-				}()
-
-				if !failed && len(st.str) > 0 && st.str[0] == 'I' {
-					st.subs.add(ret)
-					ret = &Template{Name: ret, Args: args}
-				} else {
-					// Reset back to before we started
-					// reading the template arguments.
-					// They will be read again by
-					// st.prefix.
-					*st = *save
-				}
+				ret = st.demangleCastTemplateArgs(ret, true)
 			}
 		}
 	case 'S':
@@ -1202,8 +1139,17 @@ func (st *state) demangleType(isCast bool) AST {
 			if len(st.str) == 0 || st.str[0] != 'I' {
 				addSubst = false
 			} else {
-				args := st.templateArgs()
-				ret = &Template{Name: ret, Args: args}
+				// See the function comment to explain this.
+				if _, ok := ret.(*TemplateParam); !ok || !isCast {
+					args := st.templateArgs()
+					ret = &Template{Name: ret, Args: args}
+				} else {
+					next := st.demangleCastTemplateArgs(ret, false)
+					if next == ret {
+						addSubst = false
+					}
+					ret = next
+				}
 			}
 		} else {
 			ret = st.name()
@@ -1343,6 +1289,72 @@ func (st *state) demangleType(isCast bool) AST {
 	}
 
 	return ret
+}
+
+// demangleCastTemplateArgs is for a rather hideous parse.  When we
+// see a template-param followed by a template-args, we need to decide
+// whether we have a template-param or a template-template-param.
+// Normally it is template-template-param, meaning that we pick up the
+// template arguments here.  But, if we are parsing the type for a
+// cast operator, then the only way this can be template-template-param
+// is if there is another set of template-args immediately after this
+// set.  That would look like this:
+//
+// <nested-name>
+// -> <template-prefix> <template-args>
+// -> <prefix> <template-unqualified-name> <template-args>
+// -> <unqualified-name> <template-unqualified-name> <template-args>
+// -> <source-name> <template-unqualified-name> <template-args>
+// -> <source-name> <operator-name> <template-args>
+// -> <source-name> cv <type> <template-args>
+// -> <source-name> cv <template-template-param> <template-args> <template-args>
+//
+// Otherwise, we have this derivation:
+//
+// <nested-name>
+// -> <template-prefix> <template-args>
+// -> <prefix> <template-unqualified-name> <template-args>
+// -> <unqualified-name> <template-unqualified-name> <template-args>
+// -> <source-name> <template-unqualified-name> <template-args>
+// -> <source-name> <operator-name> <template-args>
+// -> <source-name> cv <type> <template-args>
+// -> <source-name> cv <template-param> <template-args>
+//
+// in which the template-args are actually part of the prefix.  For
+// the special case where this arises, demangleType is called with
+// isCast as true.  This function is then responsible for checking
+// whether we see <template-param> <template-args> but there is not
+// another following <template-args>.  In that case, we reset the
+// parse and just return the <template-param>.
+func (st *state) demangleCastTemplateArgs(tp AST, addSubst bool) AST {
+	save := st.copy()
+
+	var args []AST
+	failed := false
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				if _, ok := r.(demangleErr); ok {
+					failed = true
+				} else {
+					panic(r)
+				}
+			}
+		}()
+
+		args = st.templateArgs()
+	}()
+
+	if !failed && len(st.str) > 0 && st.str[0] == 'I' {
+		if addSubst {
+			st.subs.add(tp)
+		}
+		return &Template{Name: tp, Args: args}
+	}
+	// Reset back to before we started reading the template arguments.
+	// They will be read again by st.prefix.
+	*st = *save
+	return tp
 }
 
 // mergeQualifiers merges two qualifer lists into one.

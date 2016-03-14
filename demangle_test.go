@@ -211,6 +211,13 @@ func TestDemangler(t *testing.T) {
 			"int C(E const&, D**, F::G::K)",
 			"C",
 		},
+		{
+			"_ZNO1A1B1C1DIZN1E1F1GINS3_1HE1IEEvMNS3_1JEFvP1LPKT_PT0_P1KESD_SA_SF_SH_EUlvE_Lb0EEcvPSB_ISG_vvEEv",
+			"A::B::C::D<void E::F::G<E::H, I>(void (E::J::*)(L*, E::H const*, I*, K*), E::H const*, L*, I*, K*)::{lambda()#1}, false>::operator K*<K, void, void>() &&",
+			"A::B::C::D<void E::F::G<E::H, I>(void (E::J::*)(L*, E::H const*, I*, K*), E::H const*, L*, I*, K*)::{lambda()#1}, false>::operator K*<K, void, void>",
+			"A::B::C::D::operator K*() &&",
+			"A::B::C::D::operator K*",
+		},
 	}
 
 	for _, test := range tests {
