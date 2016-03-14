@@ -232,6 +232,13 @@ func TestDemangler(t *testing.T) {
 			"std::A::J(std::K const&, unsigned int)",
 			"std::A::J",
 		},
+		{
+			"_ZNSt1A1BIiNS_1CIiEEE1DIPiEENS_1EIXaasr1FIT_EE1Gsr1HIiNS_1IIS7_E1JEEE1KEvE1LES7_S7_",
+			"std::A::E<F<int*>::G&&H<int, std::A::I<F>::J>::K, void>::L std::A::B<int, std::A::C<int> >::D<int*>(F, F)",
+			"std::A::B<int, std::A::C<int> >::D<int*>",
+			"std::A::E::L std::A::B::D(F, F)",
+			"std::A::B::D",
+		},
 	}
 
 	for _, test := range tests {

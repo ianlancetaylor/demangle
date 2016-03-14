@@ -1781,7 +1781,7 @@ func (st *state) expression() AST {
 				}
 				n := st.sourceName()
 				if len(st.str) > 0 && st.str[0] == 'I' {
-					st.subs.add(s)
+					st.subs.add(n)
 					args := st.templateArgs()
 					n = &Template{Name: n, Args: args}
 				}
