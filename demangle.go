@@ -711,6 +711,10 @@ var operators = map[string]operator{
 	"eO": {"^=", 2},
 	"eo": {"^", 2},
 	"eq": {"==", 2},
+	"fl": {"...", 2},
+	"fr": {"...", 2},
+	"fL": {"...", 3},
+	"fR": {"...", 3},
 	"ge": {">=", 2},
 	"gs": {"::", 1},
 	"gt": {">", 2},
@@ -1804,6 +1808,20 @@ func (st *state) expression() AST {
 		e := st.expression()
 		pack := st.findArgumentPack(e)
 		return &PackExpansion{Base: e, Pack: pack}
+	} else if st.str[0] == 's' && len(st.str) > 1 && st.str[1] == 'Z' {
+		st.advance(2)
+		e := st.expression()
+		ap := st.findArgumentPack(e)
+		return &SizeofPack{Pack: ap}
+	} else if st.str[0] == 's' && len(st.str) > 1 && st.str[1] == 'P' {
+		st.advance(2)
+		var args []AST
+		for len(st.str) == 0 || st.str[0] != 'E' {
+			arg := st.templateArg()
+			args = append(args, arg)
+		}
+		st.advance(1)
+		return &SizeofArgs{Args: args}
 	} else if st.str[0] == 'f' && len(st.str) > 1 && st.str[1] == 'p' {
 		st.advance(2)
 		if len(st.str) > 0 && st.str[0] == 'T' {
@@ -1870,6 +1888,10 @@ func (st *state) expression() AST {
 			var left, right AST
 			if code == "sc" || code == "dc" || code == "cc" || code == "rc" {
 				left = st.demangleType(false)
+			} else if code[0] == 'f' {
+				left, _ = st.operatorName(true)
+				right = st.expression()
+				return &Fold{Left: code[1] == 'l', Op: left, Arg1: right, Arg2: nil}
 			} else {
 				left = st.expression()
 			}
@@ -1910,6 +1932,11 @@ func (st *state) expression() AST {
 					st.fail("unrecognized new initializer")
 				}
 				return &New{Op: o, Place: place, Type: t, Init: ini}
+			} else if code[0] == 'f' {
+				first, _ := st.operatorName(true)
+				second := st.expression()
+				third := st.expression()
+				return &Fold{Left: code[1] == 'L', Op: first, Arg1: second, Arg2: third}
 			} else {
 				first := st.expression()
 				second := st.expression()

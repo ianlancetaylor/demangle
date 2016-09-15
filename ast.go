@@ -1619,6 +1619,110 @@ func (ap *ArgumentPack) goString(indent int, field string) string {
 	return s
 }
 
+// SizeofPack is the sizeof operator applied to an argument pack.
+type SizeofPack struct {
+	Pack *ArgumentPack
+}
+
+func (sp *SizeofPack) print(ps *printState) {
+	ps.writeString(fmt.Sprintf("%d", len(sp.Pack.Args)))
+}
+
+func (sp *SizeofPack) Traverse(fn func(AST) bool) {
+	fn(sp)
+	// Don't traverse the pack--it points elsewhere in the AST.
+}
+
+func (sp *SizeofPack) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(sp) {
+		return nil
+	}
+	sp = &SizeofPack{Pack: sp.Pack}
+	if r := fn(sp); r != nil {
+		return r
+	}
+	return sp
+}
+
+func (sp *SizeofPack) GoString() string {
+	return sp.goString(0, "")
+}
+
+func (sp *SizeofPack) goString(indent int, field string) string {
+	return fmt.Sprintf("%*s%sSizeofPack: Pack: %p", indent, "", field, sp.Pack)
+}
+
+// SizeofArgs is the size of a captured template parameter pack from
+// an alias template.
+type SizeofArgs struct {
+	Args []AST
+}
+
+func (sa *SizeofArgs) print(ps *printState) {
+	c := 0
+	for _, a := range sa.Args {
+		if ap, ok := a.(*ArgumentPack); ok {
+			c += len(ap.Args)
+		} else if el, ok := a.(*ExprList); ok {
+			c += len(el.Exprs)
+		} else {
+			c++
+		}
+	}
+	ps.writeString(fmt.Sprintf("%d", c))
+}
+
+func (sa *SizeofArgs) Traverse(fn func(AST) bool) {
+	if fn(sa) {
+		for _, a := range sa.Args {
+			a.Traverse(fn)
+		}
+	}
+}
+
+func (sa *SizeofArgs) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(sa) {
+		return nil
+	}
+	changed := false
+	args := make([]AST, len(sa.Args))
+	for i, a := range sa.Args {
+		ac := a.Copy(fn, skip)
+		if ac == nil {
+			args[i] = a
+		} else {
+			args[i] = ac
+			changed = true
+		}
+	}
+	if !changed {
+		return fn(sa)
+	}
+	sa = &SizeofArgs{Args: args}
+	if r := fn(sa); r != nil {
+		return r
+	}
+	return sa
+}
+
+func (sa *SizeofArgs) GoString() string {
+	return sa.goString(0, "")
+}
+
+func (sa *SizeofArgs) goString(indent int, field string) string {
+	var args string
+	if len(sa.Args) == 0 {
+		args = fmt.Sprintf("%*sArgs: nil", indent+2, "")
+	} else {
+		args = fmt.Sprintf("%*sArgs:", indent+2, "")
+		for i, a := range sa.Args {
+			args += "\n"
+			args += a.goString(indent+4, fmt.Sprintf("%d: ", i))
+		}
+	}
+	return fmt.Sprintf("%*s%sSizeofArgs:\n%s", indent, "", field, args)
+}
+
 // Cast is a type cast.
 type Cast struct {
 	To AST
@@ -1992,6 +2096,103 @@ func (t *Trinary) goString(indent int, field string) string {
 		t.First.goString(indent+2, "First: "),
 		t.Second.goString(indent+2, "Second: "),
 		t.Third.goString(indent+2, "Third: "))
+}
+
+// Fold is a C++17 fold-expression.  Arg2 is nil for a unary operator.
+type Fold struct {
+	Left bool
+	Op   AST
+	Arg1 AST
+	Arg2 AST
+}
+
+func (f *Fold) print(ps *printState) {
+	op, _ := f.Op.(*Operator)
+	printOp := func() {
+		if op != nil {
+			ps.writeString(op.Name)
+		} else {
+			f.Op.print(ps)
+		}
+	}
+
+	if f.Arg2 == nil {
+		if f.Left {
+			ps.writeString("(...")
+			printOp()
+			parenthesize(ps, f.Arg1)
+			ps.writeString(")")
+		} else {
+			ps.writeString("(")
+			parenthesize(ps, f.Arg1)
+			printOp()
+			ps.writeString("...)")
+		}
+	} else {
+		ps.writeString("(")
+		parenthesize(ps, f.Arg1)
+		printOp()
+		ps.writeString("...")
+		printOp()
+		parenthesize(ps, f.Arg2)
+		ps.writeString(")")
+	}
+}
+
+func (f *Fold) Traverse(fn func(AST) bool) {
+	if fn(f) {
+		f.Op.Traverse(fn)
+		f.Arg1.Traverse(fn)
+		if f.Arg2 != nil {
+			f.Arg2.Traverse(fn)
+		}
+	}
+}
+
+func (f *Fold) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(f) {
+		return nil
+	}
+	op := f.Op.Copy(fn, skip)
+	arg1 := f.Arg1.Copy(fn, skip)
+	var arg2 AST
+	if f.Arg2 != nil {
+		arg2 = f.Arg2.Copy(fn, skip)
+	}
+	if op == nil && arg1 == nil && arg2 == nil {
+		return fn(f)
+	}
+	if op == nil {
+		op = f.Op
+	}
+	if arg1 == nil {
+		arg1 = f.Arg1
+	}
+	if arg2 == nil {
+		arg2 = f.Arg2
+	}
+	f = &Fold{Left: f.Left, Op: op, Arg1: arg1, Arg2: arg2}
+	if r := fn(f); r != nil {
+		return r
+	}
+	return f
+}
+
+func (f *Fold) GoString() string {
+	return f.goString(0, "")
+}
+
+func (f *Fold) goString(indent int, field string) string {
+	if f.Arg2 == nil {
+		return fmt.Sprintf("%*s%sFold: Left: %t\n%s\n%s", indent, "", field,
+			f.Left, f.Op.goString(indent+2, "Op: "),
+			f.Arg1.goString(indent+2, "Arg1: "))
+	} else {
+		return fmt.Sprintf("%*s%sFold: Left: %t\n%s\n%s\n%s", indent, "", field,
+			f.Left, f.Op.goString(indent+2, "Op: "),
+			f.Arg1.goString(indent+2, "Arg1: "),
+			f.Arg2.goString(indent+2, "Arg2: "))
+	}
 }
 
 // New is a use of operator new in an expression.
