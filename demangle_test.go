@@ -260,6 +260,13 @@ func TestDemangler(t *testing.T) {
 			"i(() restrict)::long double (long double)(() restrict) restrict",
 			"i(long double (long double) restrict)::long double (long double)",
 		},
+		{
+			"_Z1_VFaeEZS_S_ES_",
+			"_((() volatile) volatile, signed char (long double)(() volatile) volatile::(() volatile) volatile)",
+			"_",
+			"_((() volatile) volatile, signed char (long double)(() volatile) volatile::(() volatile) volatile)",
+			"_",
+		},
 	}
 
 	for _, test := range tests {

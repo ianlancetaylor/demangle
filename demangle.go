@@ -2262,10 +2262,17 @@ func (st *state) substitution(forPrefix bool) AST {
 
 			return &TemplateParam{Index: tp.Index, Template: template}
 		}
+		var seen []AST
 		skip := func(a AST) bool {
 			if _, ok := a.(*Typed); ok {
 				return true
 			}
+			for _, v := range seen {
+				if v == a {
+					return true
+				}
+			}
+			seen = append(seen, a)
 			return false
 		}
 		if c := ret.Copy(copy, skip); c != nil {
@@ -2314,7 +2321,14 @@ func isLower(c byte) bool {
 // simplify replaces template parameters with their expansions, and
 // merges qualifiers.
 func simplify(a AST) AST {
+	var seen []AST
 	skip := func(a AST) bool {
+		for _, v := range seen {
+			if v == a {
+				return true
+			}
+		}
+		seen = append(seen, a)
 		return false
 	}
 	if r := a.Copy(simplifyOne, skip); r != nil {
@@ -2395,11 +2409,20 @@ func simplifyOne(a AST) AST {
 					return nil
 				}
 
+				var seen []AST
 				skip := func(sub AST) bool {
 					// Don't traverse into another
 					// pack expansion.
-					_, skip := sub.(*PackExpansion)
-					return skip
+					if _, ok := sub.(*PackExpansion); ok {
+						return true
+					}
+					for _, v := range seen {
+						if v == sub {
+							return true
+						}
+					}
+					seen = append(seen, sub)
+					return false
 				}
 
 				b := a.Base.Copy(copy, skip)
