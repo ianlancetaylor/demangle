@@ -58,6 +58,11 @@ type printState struct {
 	// name.  This is used by types to implement the inside-out
 	// C++ declaration syntax.
 	inner []AST
+
+	// The printing field is a list of items we are currently
+	// printing.  This avoids endless recursion if a substitution
+	// reference creates a cycle in the graph.
+	printing []AST
 }
 
 // writeByte adds a byte to the string being printed.
@@ -72,6 +77,31 @@ func (ps *printState) writeString(s string) {
 		ps.last = s[len(s)-1]
 	}
 	ps.buf.WriteString(s)
+}
+
+// Print an AST.
+func (ps *printState) print(a AST) {
+	c := 0
+	for _, v := range ps.printing {
+		if v == a {
+			// We permit the type to appear once, and
+			// return without printing anything if we see
+			// it twice.  This is for a case like
+			// _Z6outer2IsEPFilES1_, where the
+			// substitution is printed differently the
+			// second time because the set of inner types
+			// is different.
+			c++
+			if c > 1 {
+				return
+			}
+		}
+	}
+	ps.printing = append(ps.printing, a)
+
+	a.print(ps)
+
+	ps.printing = ps.printing[:len(ps.printing)-1]
 }
 
 // Name is an unqualified name.
@@ -115,17 +145,17 @@ func (t *Typed) print(ps *printState) {
 	defer func() { ps.inner = holdInner }()
 
 	ps.inner = []AST{t}
-	t.Type.print(ps)
+	ps.print(t.Type)
 	if len(ps.inner) > 0 {
 		// The type did not print the name; print it now in
 		// the default location.
 		ps.writeByte(' ')
-		t.Name.print(ps)
+		ps.print(t.Name)
 	}
 }
 
 func (t *Typed) printInner(ps *printState) {
-	t.Name.print(ps)
+	ps.print(t.Name)
 }
 
 func (t *Typed) Traverse(fn func(AST) bool) {
@@ -181,9 +211,9 @@ type Qualified struct {
 }
 
 func (q *Qualified) print(ps *printState) {
-	q.Scope.print(ps)
+	ps.print(q.Scope)
 	ps.writeString("::")
-	q.Name.print(ps)
+	ps.print(q.Name)
 }
 
 func (q *Qualified) Traverse(fn func(AST) bool) {
@@ -242,7 +272,7 @@ func (t *Template) print(ps *printState) {
 	defer func() { ps.inner = holdInner }()
 
 	ps.inner = nil
-	t.Name.print(ps)
+	ps.print(t.Name)
 
 	if !ps.tparams {
 		// Do not print template parameters.
@@ -262,7 +292,7 @@ func (t *Template) print(ps *printState) {
 		if !first {
 			ps.writeString(", ")
 		}
-		a.print(ps)
+		ps.print(a)
 		first = false
 	}
 	if ps.last == '>' {
@@ -345,7 +375,7 @@ func (tp *TemplateParam) print(ps *printState) {
 	if tp.Index >= len(tp.Template.Args) {
 		panic("TemplateParam Index out of bounds")
 	}
-	tp.Template.Args[tp.Index].print(ps)
+	ps.print(tp.Template.Args[tp.Index])
 }
 
 func (tp *TemplateParam) Traverse(fn func(AST) bool) {
@@ -380,7 +410,7 @@ type TypeWithQualifiers struct {
 func (twq *TypeWithQualifiers) print(ps *printState) {
 	// Give the base type a chance to print the inner types.
 	ps.inner = append(ps.inner, twq)
-	twq.Base.print(ps)
+	ps.print(twq.Base)
 	if len(ps.inner) > 0 {
 		// The qualifier wasn't printed by Base.
 		ps.writeByte(' ')
@@ -435,7 +465,7 @@ type MethodWithQualifiers struct {
 func (mwq *MethodWithQualifiers) print(ps *printState) {
 	// Give the base type a chance to print the inner types.
 	ps.inner = append(ps.inner, mwq)
-	mwq.Method.print(ps)
+	ps.print(mwq.Method)
 	if len(ps.inner) > 0 {
 		if len(mwq.Qualifiers) > 0 {
 			ps.writeByte(' ')
@@ -532,7 +562,7 @@ func (bt *BuiltinType) goString(indent int, field string) string {
 // simple suffix.
 func printBase(ps *printState, qual, base AST) {
 	ps.inner = append(ps.inner, qual)
-	base.print(ps)
+	ps.print(base)
 	if len(ps.inner) > 0 {
 		qual.(innerPrinter).printInner(ps)
 		ps.inner = ps.inner[:len(ps.inner)-1]
@@ -762,7 +792,7 @@ type VendorQualifier struct {
 
 func (vq *VendorQualifier) print(ps *printState) {
 	ps.inner = append(ps.inner, vq)
-	vq.Type.print(ps)
+	ps.print(vq.Type)
 	if len(ps.inner) > 0 {
 		ps.printOneInner(nil)
 	}
@@ -770,7 +800,7 @@ func (vq *VendorQualifier) print(ps *printState) {
 
 func (vq *VendorQualifier) printInner(ps *printState) {
 	ps.writeByte(' ')
-	vq.Qualifier.print(ps)
+	ps.print(vq.Qualifier)
 }
 
 func (vq *VendorQualifier) Traverse(fn func(AST) bool) {
@@ -822,7 +852,7 @@ func (at *ArrayType) print(ps *printState) {
 	// Pass the array type down as an inner type so that we print
 	// multi-dimensional arrays correctly.
 	ps.inner = append(ps.inner, at)
-	at.Element.print(ps)
+	ps.print(at.Element)
 	if ln := len(ps.inner); ln > 0 {
 		ps.inner = ps.inner[:ln-1]
 		at.printDimension(ps)
@@ -858,7 +888,7 @@ func (at *ArrayType) printDimension(ps *printState) {
 	}
 	ps.writeString(space)
 	ps.writeByte('[')
-	at.Dimension.print(ps)
+	ps.print(at.Dimension)
 	ps.writeByte(']')
 }
 
@@ -913,7 +943,7 @@ func (ft *FunctionType) print(ps *printState) {
 		// Pass the return type as an inner type in order to
 		// print the arguments in the right location.
 		ps.inner = append(ps.inner, ft)
-		ft.Return.print(ps)
+		ps.print(ft.Return)
 		if len(ps.inner) == 0 {
 			// Everything was printed.
 			return
@@ -971,7 +1001,7 @@ func (ft *FunctionType) printArgs(ps *printState) {
 		if !first {
 			ps.writeString(", ")
 		}
-		a.print(ps)
+		ps.print(a)
 		first = false
 	}
 	ps.writeByte(')')
@@ -1090,7 +1120,7 @@ type PtrMem struct {
 
 func (pm *PtrMem) print(ps *printState) {
 	ps.inner = append(ps.inner, pm)
-	pm.Member.print(ps)
+	ps.print(pm.Member)
 	if len(ps.inner) > 0 {
 		ps.printOneInner(nil)
 	}
@@ -1100,7 +1130,7 @@ func (pm *PtrMem) printInner(ps *printState) {
 	if ps.last != '(' {
 		ps.writeByte(' ')
 	}
-	pm.Class.print(ps)
+	ps.print(pm.Class)
 	ps.writeString("::*")
 }
 
@@ -1157,7 +1187,7 @@ func (ft *FixedType) print(ps *printState) {
 	if bt, ok := ft.Base.(*BuiltinType); ok && bt.Name == "int" {
 		// The standard demangler skips printing "int".
 	} else {
-		ft.Base.print(ps)
+		ps.print(ft.Base)
 		ps.writeByte(' ')
 	}
 	if ft.Accum {
@@ -1206,7 +1236,7 @@ type VectorType struct {
 
 func (vt *VectorType) print(ps *printState) {
 	ps.inner = append(ps.inner, vt)
-	vt.Base.print(ps)
+	ps.print(vt.Base)
 	if len(ps.inner) > 0 {
 		ps.printOneInner(nil)
 	}
@@ -1214,7 +1244,7 @@ func (vt *VectorType) print(ps *printState) {
 
 func (vt *VectorType) printInner(ps *printState) {
 	ps.writeString(" __vector(")
-	vt.Dimension.print(ps)
+	ps.print(vt.Dimension)
 	ps.writeByte(')')
 }
 
@@ -1264,7 +1294,7 @@ type Decltype struct {
 
 func (dt *Decltype) print(ps *printState) {
 	ps.writeString("decltype (")
-	dt.Expr.print(ps)
+	ps.print(dt.Expr)
 	ps.writeByte(')')
 }
 
@@ -1338,7 +1368,7 @@ type Constructor struct {
 }
 
 func (c *Constructor) print(ps *printState) {
-	c.Name.print(ps)
+	ps.print(c.Name)
 }
 
 func (c *Constructor) Traverse(fn func(AST) bool) {
@@ -1377,7 +1407,7 @@ type Destructor struct {
 
 func (d *Destructor) print(ps *printState) {
 	ps.writeByte('~')
-	d.Name.print(ps)
+	ps.print(d.Name)
 }
 
 func (d *Destructor) Traverse(fn func(AST) bool) {
@@ -1423,7 +1453,7 @@ func (gcd *GlobalCDtor) print(ps *printState) {
 		ps.writeString("destructors")
 	}
 	ps.writeString(" keyed to ")
-	gcd.Key.print(ps)
+	ps.print(gcd.Key)
 }
 
 func (gcd *GlobalCDtor) Traverse(fn func(AST) bool) {
@@ -1463,9 +1493,9 @@ type TaggedName struct {
 }
 
 func (t *TaggedName) print(ps *printState) {
-	t.Name.print(ps)
+	ps.print(t.Name)
 	ps.writeString("[abi:")
-	t.Tag.print(ps)
+	ps.print(t.Tag)
 	ps.writeByte(']')
 }
 
@@ -1521,7 +1551,7 @@ func (pe *PackExpansion) print(ps *printState) {
 		parenthesize(ps, pe.Base)
 		ps.writeString("...")
 	} else {
-		pe.Base.print(ps)
+		ps.print(pe.Base)
 	}
 }
 
@@ -1566,7 +1596,7 @@ func (ap *ArgumentPack) print(ps *printState) {
 		if i > 0 {
 			ps.writeString(", ")
 		}
-		a.print(ps)
+		ps.print(a)
 	}
 }
 
@@ -1730,7 +1760,7 @@ type Cast struct {
 
 func (c *Cast) print(ps *printState) {
 	ps.writeString("operator ")
-	c.To.print(ps)
+	ps.print(c.To)
 }
 
 func (c *Cast) Traverse(fn func(AST) bool) {
@@ -1779,7 +1809,7 @@ func parenthesize(ps *printState, val AST) {
 	if paren {
 		ps.writeByte('(')
 	}
-	val.print(ps)
+	ps.print(val)
 	if paren {
 		ps.writeByte(')')
 	}
@@ -1795,7 +1825,7 @@ func (n *Nullary) print(ps *printState) {
 	if op, ok := n.Op.(*Operator); ok {
 		ps.writeString(op.Name)
 	} else {
-		n.Op.print(ps)
+		ps.print(n.Op)
 	}
 }
 
@@ -1858,20 +1888,20 @@ func (u *Unary) print(ps *printState) {
 		ps.writeString(op.Name)
 	} else if c, ok := u.Op.(*Cast); ok {
 		ps.writeByte('(')
-		c.To.print(ps)
+		ps.print(c.To)
 		ps.writeByte(')')
 	} else {
-		u.Op.print(ps)
+		ps.print(u.Op)
 	}
 
 	if !u.Suffix {
 		if op, ok := u.Op.(*Operator); ok && op.Name == "::" {
 			// Don't use parentheses after ::.
-			expr.print(ps)
+			ps.print(expr)
 		} else if u.SizeofType {
 			// Always use parentheses for sizeof argument.
 			ps.writeByte('(')
-			expr.print(ps)
+			ps.print(expr)
 			ps.writeByte(')')
 		} else {
 			parenthesize(ps, expr)
@@ -1938,9 +1968,9 @@ func (b *Binary) print(ps *printState) {
 	if op != nil && strings.Contains(op.Name, "cast") {
 		ps.writeString(op.Name)
 		ps.writeByte('<')
-		b.Left.print(ps)
+		ps.print(b.Left)
 		ps.writeString(">(")
-		b.Right.print(ps)
+		ps.print(b.Right)
 		ps.writeByte(')')
 		return
 	}
@@ -1966,7 +1996,7 @@ func (b *Binary) print(ps *printState) {
 
 	if op != nil && op.Name == "[]" {
 		ps.writeByte('[')
-		b.Right.print(ps)
+		ps.print(b.Right)
 		ps.writeByte(']')
 		return
 	}
@@ -1976,7 +2006,7 @@ func (b *Binary) print(ps *printState) {
 			ps.writeString(op.Name)
 		}
 	} else {
-		b.Op.print(ps)
+		ps.print(b.Op)
 	}
 
 	parenthesize(ps, b.Right)
@@ -2112,7 +2142,7 @@ func (f *Fold) print(ps *printState) {
 		if op != nil {
 			ps.writeString(op.Name)
 		} else {
-			f.Op.print(ps)
+			ps.print(f.Op)
 		}
 	}
 
@@ -2210,7 +2240,7 @@ func (n *New) print(ps *printState) {
 		parenthesize(ps, n.Place)
 		ps.writeByte(' ')
 	}
-	n.Type.print(ps)
+	ps.print(n.Type)
 	if n.Init != nil {
 		parenthesize(ps, n.Init)
 	}
@@ -2338,7 +2368,7 @@ func (l *Literal) print(ps *printState) {
 	}
 
 	ps.writeByte('(')
-	l.Type.print(ps)
+	ps.print(l.Type)
 	ps.writeByte(')')
 
 	if isFloat {
@@ -2399,7 +2429,7 @@ func (el *ExprList) print(ps *printState) {
 		if i > 0 {
 			ps.writeString(", ")
 		}
-		e.print(ps)
+		ps.print(e)
 	}
 }
 
@@ -2461,10 +2491,10 @@ type InitializerList struct {
 
 func (il *InitializerList) print(ps *printState) {
 	if il.Type != nil {
-		il.Type.print(ps)
+		ps.print(il.Type)
 	}
 	ps.writeByte('{')
-	il.Exprs.print(ps)
+	ps.print(il.Exprs)
 	ps.writeByte('}')
 }
 
@@ -2525,7 +2555,7 @@ type DefaultArg struct {
 
 func (da *DefaultArg) print(ps *printState) {
 	fmt.Fprintf(&ps.buf, "{default arg#%d}::", da.Num+1)
-	da.Arg.print(ps)
+	ps.print(da.Arg)
 }
 
 func (da *DefaultArg) Traverse(fn func(AST) bool) {
@@ -2570,7 +2600,7 @@ func (cl *Closure) print(ps *printState) {
 		if i > 0 {
 			ps.writeString(", ")
 		}
-		t.print(ps)
+		ps.print(t)
 	}
 	ps.writeString(fmt.Sprintf(")#%d}", cl.Num+1))
 }
@@ -2661,7 +2691,7 @@ type Clone struct {
 }
 
 func (c *Clone) print(ps *printState) {
-	c.Base.print(ps)
+	ps.print(c.Base)
 	ps.writeString(fmt.Sprintf(" [clone %s]", c.Suffix))
 }
 
@@ -2704,7 +2734,7 @@ type Special struct {
 
 func (s *Special) print(ps *printState) {
 	ps.writeString(s.Prefix)
-	s.Val.print(ps)
+	ps.print(s.Val)
 }
 
 func (s *Special) Traverse(fn func(AST) bool) {
@@ -2747,9 +2777,9 @@ type Special2 struct {
 
 func (s *Special2) print(ps *printState) {
 	ps.writeString(s.Prefix)
-	s.Val1.print(ps)
+	ps.print(s.Val1)
 	ps.writeString(s.Middle)
-	s.Val2.print(ps)
+	ps.print(s.Val2)
 }
 
 func (s *Special2) Traverse(fn func(AST) bool) {
@@ -2830,7 +2860,7 @@ func (ps *printState) printOneInner(save *[]AST) {
 	if ip, ok := a.(innerPrinter); ok {
 		ip.printInner(ps)
 	} else {
-		a.print(ps)
+		ps.print(a)
 	}
 }
 

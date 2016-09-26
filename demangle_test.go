@@ -253,6 +253,13 @@ func TestDemangler(t *testing.T) {
 			"operator long double [new long double]",
 			"operator long double [new long double]",
 		},
+		{
+			"_ZZ1irFeeEES_S_",
+			"i(() restrict)::long double (long double)(() restrict) restrict",
+			"i(long double (long double) restrict)::long double (long double)",
+			"i(() restrict)::long double (long double)(() restrict) restrict",
+			"i(long double (long double) restrict)::long double (long double)",
+		},
 	}
 
 	for _, test := range tests {
