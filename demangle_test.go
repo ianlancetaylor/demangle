@@ -239,6 +239,20 @@ func TestDemangler(t *testing.T) {
 			"std::A::E::L std::A::B::D(F, F)",
 			"std::A::B::D",
 		},
+		{
+			"_ZNO1A1B1C1DIJOZZN1E1F1GINS4_1HINS4_1IINS4_1JEEEEEJNS4_1KEEEEN1L1MINS4_1OINT_1PEEEEERKSt6vectorIN1Q1RESaISL_EERKN3gtl1S1TIN1U1VEEERKNS4_1W1XERKNS4_1YERKNSQ_1ZINS4_1aEEEPSt13unordered_mapISL_NSK_9UniquePtrINS4_1bINS0_1cIJS9_NS7_INST_1dEEEEEENS4_1fEEEEENSC_1g1hIvEESt8equal_toISL_ESaISt4pairIKSL_S1J_EEEDpRKT0_ENKUlSL_mmS1G_E_clESL_mmS1G_EUlS9_E_OZZNS5_ISA_JSB_EEESI_SP_SX_S11_S14_S19_S1U_S1Y_ENKS1Z_clESL_mmS1G_EUlS1F_E0_EEclIJRS9_EEEDTclcl1iIXsrNS1_1jISt5tupleIJNS1_1kIS21_EENS29_IS23_EEEEJDpT_EEE1lEEcl1mIS2C_EEEspcl1mIS2D_EEEEDpOS2D_",
+			"decltype (((i<A::B::C::j<std::tuple<A::B::C::k<{lambda(E::F::I<E::F::J>)#1}>, E::F::I<E::F::J>&<L::M<E::F::O<E::F::H<E::F::I<E::F::J> >::P> > E::F::G<E::F::H<E::F::I<E::F::J> >, E::F::K>(std::vector<Q::R, std::allocator<Q::R> > const&, gtl::S::T<U::V> const&, E::F::W::X const&, E::F::Y const&, gtl::Z<E::F::a> const&, std::unordered_map<Q::R, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> >, L::g::h<void>, std::equal_to<Q::R>, std::allocator<std::pair<Q::R const, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> > > > >*, E::F::K const&)::{lambda(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >)#1}::operator()(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >) const::{lambda(E::F::I<E::F::J>)#1}&&> >, E::F::I<E::F::J>&>::l>)((m<A::B::C::k>)()))(((m<A::B::C::k<{lambda(E::F::I<E::F::J>)#1}> >)())...)) A::B::C::D<L::M<E::F::O<E::F::H<E::F::I<E::F::J> >::P> > E::F::G<E::F::H<E::F::I<E::F::J> >, E::F::K>(std::vector<Q::R, std::allocator<Q::R> > const&, gtl::S::T<U::V> const&, E::F::W::X const&, E::F::Y const&, gtl::Z<E::F::a> const&, std::unordered_map<Q::R, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> >, L::g::h<void>, std::equal_to<Q::R>, std::allocator<std::pair<Q::R const, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> > > > >*, E::F::K const&)::{lambda(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >)#1}::operator()(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >) const::{lambda(E::F::I<E::F::J>)#1}&&, L::M<E::F::O<E::F::H<E::F::I<E::F::J> >::P> > E::F::G<E::F::H<E::F::I<E::F::J> >, E::F::K>(std::vector<Q::R, std::allocator<Q::R> > const&, gtl::S::T<U::V> const&, E::F::W::X const&, E::F::Y const&, gtl::Z<E::F::a> const&, std::unordered_map<Q::R, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> >, L::g::h<void>, std::equal_to<Q::R>, std::allocator<std::pair<Q::R const, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> > > > >*, E::F::K const&)::{lambda(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >)#1}::operator()(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >) const::{lambda(E::F::I<U::d>)#2}&&>::operator()<E::F::I<E::F::J>&>((A::B::C::k<{lambda(E::F::I<E::F::J>)#1}>&&)...) &&",
+			"A::B::C::D<L::M<E::F::O<E::F::H<E::F::I<E::F::J> >::P> > E::F::G<E::F::H<E::F::I<E::F::J> >, E::F::K>(std::vector<Q::R, std::allocator<Q::R> > const&, gtl::S::T<U::V> const&, E::F::W::X const&, E::F::Y const&, gtl::Z<E::F::a> const&, std::unordered_map<Q::R, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> >, L::g::h<void>, std::equal_to<Q::R>, std::allocator<std::pair<Q::R const, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> > > > >*, E::F::K const&)::{lambda(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >)#1}::operator()(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >) const::{lambda(E::F::I<E::F::J>)#1}&&, L::M<E::F::O<E::F::H<E::F::I<E::F::J> >::P> > E::F::G<E::F::H<E::F::I<E::F::J> >, E::F::K>(std::vector<Q::R, std::allocator<Q::R> > const&, gtl::S::T<U::V> const&, E::F::W::X const&, E::F::Y const&, gtl::Z<E::F::a> const&, std::unordered_map<Q::R, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> >, L::g::h<void>, std::equal_to<Q::R>, std::allocator<std::pair<Q::R const, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> > > > >*, E::F::K const&)::{lambda(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >)#1}::operator()(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >) const::{lambda(E::F::I<U::d>)#2}&&>::operator()<E::F::I<E::F::J>&>",
+			"decltype (((i)((m)()))(((m)())...)) A::B::C::D::operator()((A::B::C::k&&)...) &&",
+			"A::B::C::D::operator()",
+		},
+		{
+			"_ZcvAna_eE_e",
+			"operator long double [new long double]",
+			"operator long double [new long double]",
+			"operator long double [new long double]",
+			"operator long double [new long double]",
+		},
 	}
 
 	for _, test := range tests {
@@ -289,6 +303,51 @@ func TestFailure(t *testing.T) {
 			"_Z1FQ",
 			"unrecognized type code",
 			4,
+		},
+		{
+			"_ZZSaIL0D",
+			"expected positive number",
+			8,
+		},
+		{
+			"_ZNKE",
+			"expected prefix",
+			4,
+		},
+		{
+			"_ZcvT_",
+			"not in scope of template",
+			6,
+		},
+		{
+			"_Z1AIXsZ1_EE",
+			"missing argument pack",
+			8,
+		},
+		{
+			"_Z1gIEDTclspilE",
+			"expected expression",
+			15,
+		},
+		{
+			"_ZNcvZN1ET_IEE",
+			"after local name",
+			14,
+		},
+		{
+			"_Zv00",
+			"expected positive number",
+			5,
+		},
+		{
+			"_ZcvT_B2T0",
+			"template parameter not in scope",
+			10,
+		},
+		{
+			"_ZStcvT_",
+			"template parameter not in scope",
+			8,
 		},
 	}
 

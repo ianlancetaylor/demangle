@@ -2219,9 +2219,13 @@ func (n *New) print(ps *printState) {
 func (n *New) Traverse(fn func(AST) bool) {
 	if fn(n) {
 		n.Op.Traverse(fn)
-		n.Place.Traverse(fn)
+		if n.Place != nil {
+			n.Place.Traverse(fn)
+		}
 		n.Type.Traverse(fn)
-		n.Init.Traverse(fn)
+		if n.Init != nil {
+			n.Init.Traverse(fn)
+		}
 	}
 }
 
@@ -2466,7 +2470,9 @@ func (il *InitializerList) print(ps *printState) {
 
 func (il *InitializerList) Traverse(fn func(AST) bool) {
 	if fn(il) {
-		il.Type.Traverse(fn)
+		if il.Type != nil {
+			il.Type.Traverse(fn)
+		}
 		il.Exprs.Traverse(fn)
 	}
 }

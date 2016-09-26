@@ -395,17 +395,22 @@ func (st *state) name() AST {
 	case 'Z':
 		return st.localName()
 	case 'U':
-		return st.unqualifiedName()
+		a, isCast := st.unqualifiedName()
+		if isCast {
+			st.setTemplate(a, nil)
+		}
+		return a
 	case 'S':
 		if len(st.str) < 2 {
 			st.advance(1)
 			st.fail("expected substitution index")
 		}
 		var a AST
+		isCast := false
 		subst := false
 		if st.str[1] == 't' {
 			st.advance(2)
-			a = st.unqualifiedName()
+			a, isCast = st.unqualifiedName()
 			a = &Qualified{Scope: &Name{Name: "std"}, Name: a, LocalName: false}
 		} else {
 			a = st.substitution(false)
@@ -421,16 +426,32 @@ func (st *state) name() AST {
 				st.subs.add(a)
 			}
 			args := st.templateArgs()
-			a = &Template{Name: a, Args: args}
+			tmpl := &Template{Name: a, Args: args}
+			if isCast {
+				st.setTemplate(a, tmpl)
+				isCast = false
+			}
+			a = tmpl
+		}
+		if isCast {
+			st.setTemplate(a, nil)
 		}
 		return a
 
 	default:
-		a := st.unqualifiedName()
+		a, isCast := st.unqualifiedName()
 		if len(st.str) > 0 && st.str[0] == 'I' {
 			st.subs.add(a)
 			args := st.templateArgs()
-			a = &Template{Name: a, Args: args}
+			tmpl := &Template{Name: a, Args: args}
+			if isCast {
+				st.setTemplate(a, tmpl)
+				isCast = false
+			}
+			a = tmpl
+		}
+		if isCast {
+			st.setTemplate(a, nil)
 		}
 		return a
 	}
@@ -495,10 +516,7 @@ func (st *state) prefix() AST {
 
 		c := st.str[0]
 		if isDigit(c) || isLower(c) || c == 'U' || c == 'L' {
-			next = st.unqualifiedName()
-			if _, ok := next.(*Cast); ok {
-				isCast = true
-			}
+			next, isCast = st.unqualifiedName()
 		} else {
 			switch st.str[0] {
 			case 'C':
@@ -541,6 +559,12 @@ func (st *state) prefix() AST {
 			case 'T':
 				next = st.templateParam()
 			case 'E':
+				if a == nil {
+					st.fail("expected prefix")
+				}
+				if isCast {
+					st.setTemplate(a, nil)
+				}
 				return a
 			case 'M':
 				if a == nil {
@@ -576,16 +600,20 @@ func (st *state) prefix() AST {
 //                    ::= <local-source-name>
 //
 //  <local-source-name>	::= L <source-name> <discriminator>
-func (st *state) unqualifiedName() AST {
+func (st *state) unqualifiedName() (r AST, isCast bool) {
 	if len(st.str) < 1 {
 		st.fail("expected unqualified name")
 	}
 	var a AST
+	isCast = false
 	c := st.str[0]
 	if isDigit(c) {
 		a = st.sourceName()
 	} else if isLower(c) {
 		a, _ = st.operatorName(false)
+		if _, ok := a.(*Cast); ok {
+			isCast = true
+		}
 		if op, ok := a.(*Operator); ok && op.Name == `operator"" ` {
 			n := st.sourceName()
 			a = &Unary{Op: op, Expr: n, Suffix: false, SizeofType: false}
@@ -622,15 +650,15 @@ func (st *state) unqualifiedName() AST {
 		a = st.taggedName(a)
 	}
 
-	return a
+	return a, isCast
 }
 
 // <source-name> ::= <(positive length) number> <identifier>
 // identifier ::= <(unqualified source code identifier)>
 func (st *state) sourceName() AST {
 	val := st.number()
-	if val < 0 {
-		st.fail("unexpected negative number")
+	if val <= 0 {
+		st.fail("expected positive number")
 	}
 	if len(st.str) < val {
 		st.fail("not enough characters for identifier")
@@ -1810,8 +1838,12 @@ func (st *state) expression() AST {
 		return &PackExpansion{Base: e, Pack: pack}
 	} else if st.str[0] == 's' && len(st.str) > 1 && st.str[1] == 'Z' {
 		st.advance(2)
+		off := st.off
 		e := st.expression()
 		ap := st.findArgumentPack(e)
+		if ap == nil {
+			st.failEarlier("missing argument pack", st.off-off)
+		}
 		return &SizeofPack{Pack: ap}
 	} else if st.str[0] == 's' && len(st.str) > 1 && st.str[1] == 'P' {
 		st.advance(2)
@@ -1836,7 +1868,7 @@ func (st *state) expression() AST {
 			// Skip operator function ID.
 			st.advance(2)
 		}
-		n := st.unqualifiedName()
+		n, _ := st.unqualifiedName()
 		if len(st.str) > 0 && st.str[0] == 'I' {
 			args := st.templateArgs()
 			n = &Template{Name: n, Args: args}
@@ -1898,7 +1930,7 @@ func (st *state) expression() AST {
 			if code == "cl" {
 				right = st.exprList('E')
 			} else if code == "dt" || code == "pt" {
-				right = st.unqualifiedName()
+				right, _ = st.unqualifiedName()
 				if len(st.str) > 0 && st.str[0] == 'I' {
 					args := st.templateArgs()
 					right = &Template{Name: right, Args: args}
@@ -2016,7 +2048,7 @@ func (st *state) exprPrimary() AST {
 			st.advance(1)
 		}
 		i := 0
-		for len(st.str) > 0 && st.str[i] != 'E' {
+		for len(st.str) > i && st.str[i] != 'E' {
 			i++
 		}
 		val := st.str[:i]
@@ -2296,10 +2328,9 @@ func simplify(a AST) AST {
 func simplifyOne(a AST) AST {
 	switch a := a.(type) {
 	case *TemplateParam:
-		if a.Template == nil || a.Index >= len(a.Template.Args) {
-			panic("internal error")
+		if a.Template != nil && a.Index < len(a.Template.Args) {
+			return a.Template.Args[a.Index]
 		}
-		return a.Template.Args[a.Index]
 	case *MethodWithQualifiers:
 		if m, ok := a.Method.(*MethodWithQualifiers); ok {
 			ref := a.RefQualifier
@@ -2371,7 +2402,11 @@ func simplifyOne(a AST) AST {
 					return skip
 				}
 
-				exprs[i] = simplify(a.Base.Copy(copy, skip))
+				b := a.Base.Copy(copy, skip)
+				if b == nil {
+					b = a.Base
+				}
+				exprs[i] = simplify(b)
 			}
 			return &ExprList{Exprs: exprs}
 		}
