@@ -267,6 +267,13 @@ func TestDemangler(t *testing.T) {
 			"_((() volatile) volatile, signed char (long double)(() volatile) volatile::(() volatile) volatile)",
 			"_",
 		},
+		{
+			"_ZdsrFliEZS_GS_EcvS_",
+			"operator.*(( ( _Imaginary)( _Imaginary) restrict) restrict, long (int)( ( _Imaginary)( _Imaginary) restrict) restrict::operator ( ( _Imaginary)( _Imaginary) restrict) restrict)",
+			"operator.*",
+			"operator.*(( ( _Imaginary)( _Imaginary) restrict) restrict, long (int)( ( _Imaginary)( _Imaginary) restrict) restrict::operator ( ( _Imaginary)( _Imaginary) restrict) restrict)",
+			"operator.*",
+		},
 	}
 
 	for _, test := range tests {
@@ -362,6 +369,26 @@ func TestFailure(t *testing.T) {
 			"_ZStcvT_",
 			"template parameter not in scope",
 			8,
+		},
+		{
+			"_Z1aIeEU1RT_ZcvS1_",
+			"expected E after local name",
+			18,
+		},
+		{
+			"_ZNcvT_oRIEE",
+			"template index out of range",
+			11,
+		},
+		{
+			"_ZNcvT_D0IIEE",
+			"expected prefix",
+			13,
+		},
+		{
+			"_ZcvT_IAoncvT__eE",
+			"template parameter not in scope",
+			17,
 		},
 	}
 

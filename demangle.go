@@ -429,6 +429,7 @@ func (st *state) name() AST {
 			tmpl := &Template{Name: a, Args: args}
 			if isCast {
 				st.setTemplate(a, tmpl)
+				st.clearTemplateArgs(args)
 				isCast = false
 			}
 			a = tmpl
@@ -446,6 +447,7 @@ func (st *state) name() AST {
 			tmpl := &Template{Name: a, Args: args}
 			if isCast {
 				st.setTemplate(a, tmpl)
+				st.clearTemplateArgs(args)
 				isCast = false
 			}
 			a = tmpl
@@ -516,7 +518,11 @@ func (st *state) prefix() AST {
 
 		c := st.str[0]
 		if isDigit(c) || isLower(c) || c == 'U' || c == 'L' {
-			next, isCast = st.unqualifiedName()
+			un, isUnCast := st.unqualifiedName()
+			next = un
+			if isUnCast {
+				isCast = true
+			}
 		} else {
 			switch st.str[0] {
 			case 'C':
@@ -552,6 +558,7 @@ func (st *state) prefix() AST {
 				tmpl := &Template{Name: a, Args: args}
 				if isCast {
 					st.setTemplate(a, tmpl)
+					st.clearTemplateArgs(args)
 					isCast = false
 				}
 				a = nil
@@ -1674,11 +1681,15 @@ func (st *state) templateParam() AST {
 // This handles the forward referencing template parameters found in
 // cast operators.
 func (st *state) setTemplate(a AST, tmpl *Template) {
+	var seen []AST
 	a.Traverse(func(a AST) bool {
 		switch a := a.(type) {
 		case *TemplateParam:
 			if a.Template != nil {
-				panic("internal error")
+				if tmpl != nil {
+					st.fail("duplicate template parameters")
+				}
+				return false
 			}
 			if tmpl == nil {
 				st.fail("cast template parameter not in scope of template")
@@ -1689,9 +1700,25 @@ func (st *state) setTemplate(a AST, tmpl *Template) {
 			a.Template = tmpl
 			return false
 		default:
+			for _, v := range seen {
+				if v == a {
+					return false
+				}
+			}
+			seen = append(seen, a)
 			return true
 		}
 	})
+}
+
+// clearTemplateArgs gives an error for any unset Template field in
+// args.  This handles erroneous cases where a cast operator with a
+// forward referenced template is in the scope of another cast
+// operator.
+func (st *state) clearTemplateArgs(args []AST) {
+	for _, a := range args {
+		st.setTemplate(a, nil)
+	}
 }
 
 // <template-args> ::= I <template-arg>+ E
@@ -2440,6 +2467,7 @@ func simplifyOne(a AST) AST {
 // findArgumentPack walks the AST looking for the argument pack for a
 // pack expansion.  We find it via a template parameter.
 func (st *state) findArgumentPack(a AST) *ArgumentPack {
+	var seen []AST
 	var ret *ArgumentPack
 	a.Traverse(func(a AST) bool {
 		if ret != nil {
@@ -2461,6 +2489,12 @@ func (st *state) findArgumentPack(a AST) *ArgumentPack {
 		case *UnnamedType, *FixedType, *DefaultArg:
 			return false
 		}
+		for _, v := range seen {
+			if v == a {
+				return false
+			}
+		}
+		seen = append(seen, a)
 		return true
 	})
 	return ret
