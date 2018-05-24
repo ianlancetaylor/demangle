@@ -31,7 +31,7 @@ var exceptions = map[string]bool{
 	"_ZNSt9_Any_data9_M_accessIPZN13ThreadManager7newTaskIRSt5_BindIFSt7_Mem_fnIM5DiaryFivEEPS5_EEIEEESt6futureINSt9result_ofIFT_DpT0_EE4typeEEOSF_DpOSG_EUlvE_EERSF_v":                                            true,
 	"_ZNSt9_Any_data9_M_accessIPZN6cereal18polymorphic_detail15getInputBindingINS1_16JSONInputArchiveEEENS1_6detail15InputBindingMapIT_E11SerializersERS7_jEUlPvRSt10unique_ptrIvNS5_12EmptyDeleterIvEEEE0_EESA_v": true,
 	"_ZNSt9_Any_data9_M_accessIPZ4postISt8functionIFvvEEEvOT_EUlvE_EERS5_v":                                                                                                                                        true,
-	"_ZNSt9_Any_data9_M_accessIPZN13ThreadManager10futureTaskISt5_BindIFSt7_Mem_fnIM6RunnerFvvEEPS5_EEEEvOT_EUlvE_EERSC_v": true,
+	"_ZNSt9_Any_data9_M_accessIPZN13ThreadManager10futureTaskISt5_BindIFSt7_Mem_fnIM6RunnerFvvEEPS5_EEEEvOT_EUlvE_EERSC_v":                                                                                         true,
 }
 
 // For simplicity, this test reads an exact copy of
