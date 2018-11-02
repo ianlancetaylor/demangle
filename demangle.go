@@ -540,13 +540,22 @@ func (st *state) prefix() AST {
 		} else {
 			switch st.str[0] {
 			case 'C':
-				if len(st.str) < 2 {
+				inheriting := false
+				st.advance(1)
+				if len(st.str) > 0 && st.str[0] == 'I' {
+					inheriting = true
+					st.advance(1)
+				}
+				if len(st.str) < 1 {
 					st.fail("expected constructor type")
 				}
 				if last == nil {
 					st.fail("constructor before name is seen")
 				}
-				st.advance(2)
+				st.advance(1)
+				if inheriting {
+					last = st.demangleType(false)
+				}
 				next = &Constructor{Name: getLast(last)}
 			case 'D':
 				if len(st.str) > 1 && (st.str[1] == 'T' || st.str[1] == 't') {
@@ -2087,6 +2096,9 @@ func (st *state) exprPrimary() AST {
 		if len(st.str) > 0 && st.str[0] == 'n' {
 			neg = true
 			st.advance(1)
+		}
+		if len(st.str) > 0 && st.str[0] == 'E' {
+			st.fail("missing literal value")
 		}
 		i := 0
 		for len(st.str) > i && st.str[i] != 'E' {
