@@ -5,6 +5,8 @@
 // Package demangle defines functions that demangle GCC/LLVM C++ symbol names.
 // This package recognizes names that were mangled according to the C++ ABI
 // defined at http://codesourcery.com/cxx-abi/.
+//
+// Most programs will want to call Filter or ToString.
 package demangle
 
 import (
@@ -45,7 +47,7 @@ func Filter(name string, options ...Option) string {
 	return ret
 }
 
-// ToString demangles a C++ symbol name, returning human-readable C++
+// ToString demangles a C++ symbol name, returning a human-readable C++
 // name or an error.
 // If the name does not appear to be a C++ symbol name at all, the
 // error will be ErrNotMangledName.
