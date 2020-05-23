@@ -1288,6 +1288,8 @@ func (st *state) demangleType(isCast bool) AST {
 
 		case 'a':
 			ret = &Name{Name: "auto"}
+		case 'c':
+			ret = &Name{Name: "decltype(auto)"}
 
 		case 'f':
 			ret = &BuiltinType{Name: "decimal32"}
