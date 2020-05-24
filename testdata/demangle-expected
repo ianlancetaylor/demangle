@@ -1301,3 +1301,17 @@ void binary_left<1, 2, 3>(A<((42)+...+(1, 2, 3))>)
 
 _Z12binary_rightIJLi1ELi2ELi3EEEv1AIXfRplT_Li42EEE
 void binary_right<1, 2, 3>(A<((1, 2, 3)+...+(42))>)
+# Inheriting constructor
+
+_ZN1DCI11BEi
+D::B(int)
+# exception-specification (C++17)
+
+_Z1fIvJiELb0EEvPDOT1_EFT_DpT0_E
+void f<void, int, false>(void (*)(int) noexcept(false))
+
+_Z1fIvJiELb0EEvPDoFT_DpT0_E
+void f<void, int, false>(void (*)(int) noexcept)
+
+_Z1fIvJiELb0EEvPDwiEFT_DpT0_E
+void f<void, int, false>(void (*)(int) throw(int))
