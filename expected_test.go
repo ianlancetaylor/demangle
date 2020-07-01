@@ -34,6 +34,11 @@ var exceptions = map[string]bool{
 	"_ZNSt9_Any_data9_M_accessIPZ4postISt8functionIFvvEEEvOT_EUlvE_EERS5_v":                                                                                                                                        true,
 	"_ZNSt9_Any_data9_M_accessIPZN13ThreadManager10futureTaskISt5_BindIFSt7_Mem_fnIM6RunnerFvvEEPS5_EEEEvOT_EUlvE_EERSC_v":                                                                                         true,
 
+	// The standard demangler appears to mishandle the argument here,
+	// treating it as a lamdba auto when I think it ought to be a
+	// template argument.
+	"_Z7forwardIZ3FoovEUlPA5_T_E1_EOS0_RS0_": true,
+
 	// These exceptions are because we handle recursion differently,
 	// and permit some cases that the standard demangler blocks.
 	"_Z1KMMMMMMMMMMMMMMMA_xooooooooooooooo": true,

@@ -63,6 +63,13 @@ type printState struct {
 	// printing.  This avoids endless recursion if a substitution
 	// reference creates a cycle in the graph.
 	printing []AST
+
+	// A TemplateParam in a Closure is actually an auto.
+	// In order for substitutions to work correctly,
+	// we have to produce TemplateParam AST nodes,
+	// and print them as "auto" when printing a Closure.
+	// See https://gcc.gnu.org/PR78252.
+	inLambda int
 }
 
 // writeByte adds a byte to the string being printed.
@@ -369,6 +376,10 @@ type TemplateParam struct {
 }
 
 func (tp *TemplateParam) print(ps *printState) {
+	if ps.inLambda > 0 {
+		ps.writeString(fmt.Sprintf("auto:%d", tp.Index+1))
+		return
+	}
 	if tp.Template == nil {
 		panic("TemplateParam Template field is nil")
 	}
@@ -2743,12 +2754,14 @@ type Closure struct {
 
 func (cl *Closure) print(ps *printState) {
 	ps.writeString("{lambda(")
+	ps.inLambda++
 	for i, t := range cl.Types {
 		if i > 0 {
 			ps.writeString(", ")
 		}
 		ps.print(t)
 	}
+	ps.inLambda--
 	ps.writeString(fmt.Sprintf(")#%d}", cl.Num+1))
 }
 

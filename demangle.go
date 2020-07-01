@@ -185,6 +185,7 @@ type state struct {
 	off       int           // offset of str within original string
 	subs      substitutions // substitutions
 	templates []*Template   // templates being processed
+	inLambda  int           // number of lambdas being parsed
 }
 
 // copy returns a copy of the current state.
@@ -1731,13 +1732,20 @@ func (st *state) compactNumber() int {
 // whatever the template parameter would be expanded to here.  We sort
 // this out in substitution and simplify.
 func (st *state) templateParam() AST {
-	if len(st.templates) == 0 {
+	if len(st.templates) == 0 && st.inLambda == 0 {
 		st.fail("template parameter not in scope of template")
 	}
 	off := st.off
 
 	st.checkChar('T')
 	n := st.compactNumber()
+
+	if st.inLambda > 0 {
+		// g++ mangles lambda auto params as template params.
+		// Apparently we can't encounter a template within a lambda.
+		// See https://gcc.gnu.org/PR78252.
+		return &TemplateParam{Index: n, Template: nil}
+	}
 
 	template := st.templates[len(st.templates)-1]
 
@@ -1776,6 +1784,10 @@ func (st *state) setTemplate(a AST, tmpl *Template) {
 				st.fail(fmt.Sprintf("cast template index out of range (%d >= %d)", a.Index, len(tmpl.Args)))
 			}
 			a.Template = tmpl
+			return false
+		case *Closure:
+			// There are no template params in closure types.
+			// https://gcc.gnu.org/PR78252.
 			return false
 		default:
 			for _, v := range seen {
@@ -2202,7 +2214,9 @@ func (st *state) discriminator(a AST) AST {
 func (st *state) closureTypeName() AST {
 	st.checkChar('U')
 	st.checkChar('l')
+	st.inLambda++
 	types := st.parmlist()
+	st.inLambda--
 	if len(st.str) == 0 || st.str[0] != 'E' {
 		st.fail("expected E after closure type name")
 	}
@@ -2366,6 +2380,9 @@ func (st *state) substitution(forPrefix bool) AST {
 			if !ok {
 				return nil
 			}
+			if st.inLambda > 0 {
+				return &TemplateParam{Index: tp.Index, Template: nil}
+			}
 			if len(st.templates) == 0 {
 				st.failEarlier("substituted template parameter not in scope of template", dec)
 			}
@@ -2384,7 +2401,8 @@ func (st *state) substitution(forPrefix bool) AST {
 		}
 		var seen []AST
 		skip := func(a AST) bool {
-			if _, ok := a.(*Typed); ok {
+			switch a.(type) {
+			case *Typed, *Closure:
 				return true
 			}
 			for _, v := range seen {
