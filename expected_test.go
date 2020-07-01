@@ -17,14 +17,15 @@ var verbose = flag.Bool("verbose", false, "print each demangle-expected symbol")
 
 const filename = "testdata/demangle-expected"
 
-// A list of exceptions from demangle-expected that we do not handle
-// the same as the standard demangler.  We keep a list of exceptions
-// so that we can use an exact copy of the file.  These exceptions are
-// all based on different handling of a substitution that refers to a
-// template parameter.  The standard demangler seems to have a bug in
-// which template it uses when a reference or rvalue-reference refers
-// to a substitution that resolves to a template parameter.
+// exceptions is a list of exceptions from demangle-expected that we do
+// not handle the same as the standard demangler.  We keep a list of
+// exceptions so that we can use an exact copy of the file.
 var exceptions = map[string]bool{
+	// These exceptions are all based on different handling of a
+	// substitution that refers to a template parameter.
+	// The standard demangler seems to have a bug in which
+	// template it uses when a reference or rvalue-reference
+	// refers to a substitution that resolves to a template parameter.
 	"_ZSt7forwardIRN1x14refobjiteratorINS0_3refINS0_4mime30multipart_section_processorObjIZ15get_body_parserIZZN14mime_processor21make_section_iteratorERKNS2_INS3_10sectionObjENS0_10ptrrefBaseEEEbENKUlvE_clEvEUlSB_bE_ZZNS6_21make_section_iteratorESB_bENKSC_clEvEUlSB_E0_ENS1_INS2_INS0_20outputrefiteratorObjIiEES8_EEEERKSsSB_OT_OT0_EUlmE_NS3_32make_multipart_default_discarderISP_EEEES8_EEEEEOT_RNSt16remove_referenceISW_E4typeE": true,
 	"_ZN3mdr16in_cached_threadIRZNK4cudr6GPUSet17parallel_for_eachIZN5tns3d20shape_representation7compute7GPUImpl7executeERKNS_1AINS_7ptr_refIKjEELl3ELl3ENS_8c_strideILl1ELl0EEEEERKNS8_INS9_IjEELl4ELl1ESD_EEEUliRKNS1_7ContextERNS7_5StateEE_JSt6vectorISO_SaISO_EEEEEvOT_DpRT0_EUlSP_E_JSt17reference_wrapperISO_EEEENS_12ScopedFutureIDTclfp_spcl7forwardISW_Efp0_EEEEESV_DpOSW_":                                                        true,
 	"_ZNSt9_Any_data9_M_accessIPZN3sel8Selector6SetObjI3FooJPKcMS4_FviEEEEvRT_DpT0_EUlvE_EESA_v":                                                                                                                   true,
@@ -32,6 +33,12 @@ var exceptions = map[string]bool{
 	"_ZNSt9_Any_data9_M_accessIPZN6cereal18polymorphic_detail15getInputBindingINS1_16JSONInputArchiveEEENS1_6detail15InputBindingMapIT_E11SerializersERS7_jEUlPvRSt10unique_ptrIvNS5_12EmptyDeleterIvEEEE0_EESA_v": true,
 	"_ZNSt9_Any_data9_M_accessIPZ4postISt8functionIFvvEEEvOT_EUlvE_EERS5_v":                                                                                                                                        true,
 	"_ZNSt9_Any_data9_M_accessIPZN13ThreadManager10futureTaskISt5_BindIFSt7_Mem_fnIM6RunnerFvvEEPS5_EEEEvOT_EUlvE_EERSC_v":                                                                                         true,
+
+	// These exceptions are because we handle recursion differently,
+	// and permit some cases that the standard demangler blocks.
+	"_Z1KMMMMMMMMMMMMMMMA_xooooooooooooooo": true,
+	"_ZdvMMMMMMMMMMMMMrrrrA_DTdvfp_fp_Eededilfdfdfdfd": true,
+	"_Z1MA_aMMMMA_MMA_MMMMMMMMSt1MS_o11T0000000000t2M0oooozoooo": true,
 }
 
 // For simplicity, this test reads an exact copy of
