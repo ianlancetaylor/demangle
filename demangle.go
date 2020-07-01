@@ -313,7 +313,20 @@ func (st *state) encoding(params bool, local forLocalNameType) AST {
 	if mwq != nil {
 		check = mwq.Method
 	}
-	template, _ := check.(*Template)
+
+	var template *Template
+	switch check := check.(type) {
+	case *Template:
+		template = check
+	case *Qualified:
+		if check.LocalName {
+			n := check.Name
+			if nmwq, ok := n.(*MethodWithQualifiers); ok {
+				n = nmwq.Method
+			}
+			template, _ = n.(*Template)
+		}
+	}
 	if template != nil {
 		st.templates = append(st.templates, template)
 	}
@@ -359,6 +372,11 @@ func (st *state) encoding(params bool, local forLocalNameType) AST {
 // return type.
 func hasReturnType(a AST) bool {
 	switch a := a.(type) {
+	case *Qualified:
+		if a.LocalName {
+			return hasReturnType(a.Name)
+		}
+		return false
 	case *Template:
 		return !isCDtorConversion(a.Name)
 	case *TypeWithQualifiers:
