@@ -930,6 +930,7 @@ func (st *state) javaResource() AST {
 //                ::= TT <type>
 //                ::= TI <type>
 //                ::= TS <type>
+//                ::= TA <template-arg>
 //                ::= GV <(object) name>
 //                ::= T <call-offset> <(base) encoding>
 //                ::= Tc <call-offset> <call-offset> <(base) encoding>
@@ -963,6 +964,9 @@ func (st *state) specialName() AST {
 		case 'S':
 			t := st.demangleType(false)
 			return &Special{Prefix: "typeinfo name for ", Val: t}
+		case 'A':
+			t := st.templateArg()
+			return &Special{Prefix: "template parameter object for ", Val: t}
 		case 'h':
 			st.callOffset('h')
 			v := st.encoding(true, notForLocalName)
@@ -2166,16 +2170,28 @@ func (st *state) exprPrimary() AST {
 	return ret
 }
 
-// <discriminator> ::= _ <(non-negative) number>
+// <discriminator> ::= _ <(non-negative) number> (when number < 10)
+//                     __ <(non-negative) number> _ (when number >= 10)
 func (st *state) discriminator(a AST) AST {
 	if len(st.str) == 0 || st.str[0] != '_' {
 		return a
 	}
 	off := st.off
 	st.advance(1)
+	trailingUnderscore := false
+	if len(st.str) > 0 && st.str[0] == '_' {
+		st.advance(1)
+		trailingUnderscore = true
+	}
 	d := st.number()
 	if d < 0 {
 		st.failEarlier("invalid negative discriminator", st.off-off)
+	}
+	if trailingUnderscore && d >= 10 {
+		if len(st.str) == 0 || st.str[0] != '_' {
+			st.fail("expected _ after discriminator >= 10")
+		}
+		st.advance(1)
 	}
 	// We don't currently print out the discriminator, so we don't
 	// save it.
