@@ -1322,6 +1322,8 @@ func (st *state) demangleType(isCast bool) AST {
 			ret = &BuiltinType{Name: "decimal128"}
 		case 'h':
 			ret = &BuiltinType{Name: "half"}
+		case 'u':
+			ret = &BuiltinType{Name: "char8_t"}
 		case 's':
 			ret = &BuiltinType{Name: "char16_t"}
 		case 'i':
@@ -2183,7 +2185,14 @@ func (st *state) exprPrimary() AST {
 			st.advance(1)
 		}
 		if len(st.str) > 0 && st.str[0] == 'E' {
-			st.fail("missing literal value")
+			if bt, ok := t.(*BuiltinType); ok && bt.Name == "decltype(nullptr)" {
+				// A nullptr should not have a value.
+				// We accept one if present because GCC
+				// used to generate one.
+				// https://gcc.gnu.org/PR91979.
+			} else {
+				st.fail("missing literal value")
+			}
 		}
 		i := 0
 		for len(st.str) > i && st.str[i] != 'E' {

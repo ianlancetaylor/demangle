@@ -2520,6 +2520,9 @@ func (l *Literal) print(ps *printState) {
 				ps.writeString("true")
 				return
 			}
+		} else if b.Name == "decltype(nullptr)" && l.Val == "" {
+			ps.print(l.Type)
+			return
 		} else {
 			isFloat = builtinTypeFloat[b.Name]
 		}
