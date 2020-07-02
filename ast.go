@@ -63,13 +63,6 @@ type printState struct {
 	// printing.  This avoids endless recursion if a substitution
 	// reference creates a cycle in the graph.
 	printing []AST
-
-	// A TemplateParam in a Closure is actually an auto.
-	// In order for substitutions to work correctly,
-	// we have to produce TemplateParam AST nodes,
-	// and print them as "auto" when printing a Closure.
-	// See https://gcc.gnu.org/PR78252.
-	inLambda int
 }
 
 // writeByte adds a byte to the string being printed.
@@ -376,10 +369,6 @@ type TemplateParam struct {
 }
 
 func (tp *TemplateParam) print(ps *printState) {
-	if ps.inLambda > 0 {
-		ps.writeString(fmt.Sprintf("auto:%d", tp.Index+1))
-		return
-	}
 	if tp.Template == nil {
 		panic("TemplateParam Template field is nil")
 	}
@@ -407,6 +396,36 @@ func (tp *TemplateParam) GoString() string {
 
 func (tp *TemplateParam) goString(indent int, field string) string {
 	return fmt.Sprintf("%*s%sTemplateParam: Template: %p; Index %d", indent, "", field, tp.Template, tp.Index)
+}
+
+// LambdaAuto is a lambda auto parameter.
+type LambdaAuto struct {
+	Index int
+}
+
+func (la *LambdaAuto) print(ps *printState) {
+	// We print the index plus 1 because that is what the standard
+	// demangler does.
+	fmt.Fprintf(&ps.buf, "auto:%d", la.Index + 1)
+}
+
+func (la *LambdaAuto) Traverse(fn func(AST) bool) {
+	fn(la)
+}
+
+func (la *LambdaAuto) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(la) {
+		return nil
+	}
+	return fn(la)
+}
+
+func (la *LambdaAuto) GoString() string {
+	return la.goString(0, "")
+}
+
+func (la *LambdaAuto) goString(indent int, field string) string {
+	return fmt.Sprintf("%*s%sLambdaAuto: Index %d", indent, "", field, la.Index)
 }
 
 // Qualifiers is an ordered list of type qualifiers.
@@ -2757,14 +2776,12 @@ type Closure struct {
 
 func (cl *Closure) print(ps *printState) {
 	ps.writeString("{lambda(")
-	ps.inLambda++
 	for i, t := range cl.Types {
 		if i > 0 {
 			ps.writeString(", ")
 		}
 		ps.print(t)
 	}
-	ps.inLambda--
 	ps.writeString(fmt.Sprintf(")#%d}", cl.Num+1))
 }
 

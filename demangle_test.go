@@ -274,6 +274,13 @@ func TestDemangler(t *testing.T) {
 			"operator.*(( ( _Imaginary)( _Imaginary) restrict) restrict, long (int)( ( _Imaginary)( _Imaginary) restrict) restrict::operator ( ( _Imaginary)( _Imaginary) restrict) restrict)",
 			"operator.*",
 		},
+		{
+			"_ZZN1A1B1CIfEEvPNS_1DERKNS_1EEiS6_T_S7_S7_RKNSt3__u1FIFS7_iiEEEbbPiENKUlZNS1_IfEEvS3_S6_iS6_S7_S7_S7_SD_bbSE_E1GSF_E_clESF_SF_",
+			"A::B::C<float>(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F<float (int, int)> const&, bool, bool, int*)::{lambda(A::B::C<float>(A::D*, A::E const&, int, A::E const&, auto:1, auto:1, auto:1, std::__u::F<auto:1 (int, int)> const&, bool, bool, int*)::G, A::B::C<float>(A::D*, A::E const&, int, A::E const&, auto:1, auto:1, auto:1, std::__u::F<auto:1 (int, int)> const&, bool, bool, int*)::G)#1}::operator()(A::B::C<float>(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F<float (int, int)> const&, bool, bool, int*)::G, A::B::C<float>(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F<float (int, int)> const&, bool, bool, int*)::G) const",
+			"A::B::C<float>(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F<float (int, int)> const&, bool, bool, int*)::{lambda(A::B::C<float>(A::D*, A::E const&, int, A::E const&, auto:1, auto:1, auto:1, std::__u::F<auto:1 (int, int)> const&, bool, bool, int*)::G, A::B::C<float>(A::D*, A::E const&, int, A::E const&, auto:1, auto:1, auto:1, std::__u::F<auto:1 (int, int)> const&, bool, bool, int*)::G)#1}::operator()",
+			"A::B::C(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F const&, bool, bool, int*)::{lambda(A::B::C(A::D*, A::E const&, int, A::E const&, auto:1, auto:1, auto:1, std::__u::F const&, bool, bool, int*)::G, A::B::C(A::D*, A::E const&, int, A::E const&, auto:1, auto:1, auto:1, std::__u::F const&, bool, bool, int*)::G)#1}::operator()(A::B::C(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F const&, bool, bool, int*)::G, A::B::C(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F const&, bool, bool, int*)::G) const",
+			"A::B::C(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F const&, bool, bool, int*)::{lambda(A::B::C(A::D*, A::E const&, int, A::E const&, auto:1, auto:1, auto:1, std::__u::F const&, bool, bool, int*)::G, A::B::C(A::D*, A::E const&, int, A::E const&, auto:1, auto:1, auto:1, std::__u::F const&, bool, bool, int*)::G)#1}::operator()",
+		},
 	}
 
 	for _, test := range tests {

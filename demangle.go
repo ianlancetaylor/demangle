@@ -1768,7 +1768,7 @@ func (st *state) templateParam() AST {
 		// g++ mangles lambda auto params as template params.
 		// Apparently we can't encounter a template within a lambda.
 		// See https://gcc.gnu.org/PR78252.
-		return &TemplateParam{Index: n, Template: nil}
+		return &LambdaAuto{Index: n}
 	}
 
 	template := st.templates[len(st.templates)-1]
@@ -2406,35 +2406,63 @@ func (st *state) substitution(forPrefix bool) AST {
 		// We need to update any references to template
 		// parameters to refer to the currently active
 		// template.
+
+		// When copying a Typed we may need to adjust
+		// the templates.
+		copyTemplates := st.templates
+
 		copy := func(a AST) AST {
-			tp, ok := a.(*TemplateParam)
-			if !ok {
+			var index int
+			switch a := a.(type) {
+			case *Typed:
+				// Remove the template added in skip.
+				if _, ok := a.Name.(*Template); ok {
+					copyTemplates = copyTemplates[:len(copyTemplates)-1]
+				}
+				return nil
+			case *TemplateParam:
+				index = a.Index
+			case *LambdaAuto:
+				// A lambda auto parameter is represented
+				// as a template parameter, so we may have
+				// to change back when substituting.
+				index = a.Index
+			default:
 				return nil
 			}
 			if st.inLambda > 0 {
-				return &TemplateParam{Index: tp.Index, Template: nil}
+				if _, ok := a.(*LambdaAuto); ok {
+					return nil
+				}
+				return &LambdaAuto{Index: index}
 			}
-			if len(st.templates) == 0 {
+			if len(copyTemplates) == 0 {
 				st.failEarlier("substituted template parameter not in scope of template", dec)
 			}
-			template := st.templates[len(st.templates)-1]
+			template := copyTemplates[len(copyTemplates)-1]
 			if template == nil {
 				// This template parameter is within
 				// the scope of a cast operator.
-				return &TemplateParam{Index: tp.Index, Template: nil}
+				return &TemplateParam{Index: index, Template: nil}
 			}
 
-			if tp.Index >= len(template.Args) {
-				st.failEarlier(fmt.Sprintf("substituted template index out of range (%d >= %d)", tp.Index, len(template.Args)), dec)
+			if index >= len(template.Args) {
+				st.failEarlier(fmt.Sprintf("substituted template index out of range (%d >= %d)", index, len(template.Args)), dec)
 			}
 
-			return &TemplateParam{Index: tp.Index, Template: template}
+			return &TemplateParam{Index: index, Template: template}
 		}
 		var seen []AST
 		skip := func(a AST) bool {
-			switch a.(type) {
-			case *Typed, *Closure:
-				return true
+			switch a := a.(type) {
+			case *Typed:
+				if template, ok := a.Name.(*Template); ok {
+					// This template is removed in copy.
+					copyTemplates = append(copyTemplates, template)
+				}
+				return false
+			case *TemplateParam, *LambdaAuto:
+				return false
 			}
 			for _, v := range seen {
 				if v == a {
