@@ -331,6 +331,16 @@ func (st *state) encoding(params bool, local forLocalNameType) AST {
 		st.templates = append(st.templates, template)
 	}
 
+	// Checking for the enable_if attribute here is what the LLVM
+	// demangler does.  This is not very general but perhaps it is
+	// sufficent.
+	const enableIfPrefix = "Ua9enable_ifI"
+	var enableIfArgs []AST
+	if strings.HasPrefix(st.str, enableIfPrefix) {
+		st.advance(len(enableIfPrefix) - 1)
+		enableIfArgs = st.templateArgs()
+	}
+
 	ft := st.bareFunctionType(hasReturnType(a))
 
 	if template != nil {
@@ -365,7 +375,13 @@ func (st *state) encoding(params bool, local forLocalNameType) AST {
 		}
 	}
 
-	return &Typed{Name: a, Type: ft}
+	r := AST(&Typed{Name: a, Type: ft})
+
+	if len(enableIfArgs) > 0 {
+		r = &EnableIf{Type: r, Args: enableIfArgs}
+	}
+
+	return r
 }
 
 // hasReturnType returns whether the mangled form of a will have a
@@ -1905,9 +1921,16 @@ func (st *state) exprList(stop byte) AST {
 //              ::= cl <expression>+ E
 //              ::= st <type>
 //              ::= <template-param>
+//              ::= <function-param>
 //              ::= sr <type> <unqualified-name>
 //              ::= sr <type> <unqualified-name> <template-args>
 //              ::= <expr-primary>
+//
+// <function-param> ::= fp <CV-qualifiers> _
+//                  ::= fp <CV-qualifiers> <number>
+//                  ::= fL <number> p <CV-qualifiers> _
+//                  ::= fL <number> p <CV-qualifiers> <number>
+//                  ::= fpT
 func (st *state) expression() AST {
 	if len(st.str) == 0 {
 		st.fail("expected expression")
@@ -2001,9 +2024,25 @@ func (st *state) expression() AST {
 			st.advance(1)
 			return &FunctionParam{Index: 0}
 		} else {
+			// We can see qualifiers here, but we don't
+			// include them in the demangled string.
+			st.cvQualifiers()
 			index := st.compactNumber()
 			return &FunctionParam{Index: index + 1}
 		}
+	} else if st.str[0] == 'f' && len(st.str) > 2 && st.str[1] == 'L' && isDigit(st.str[2]) {
+		st.advance(2)
+		// We don't include the scope count in the demangled string.
+		st.number()
+		if len(st.str) == 0 || st.str[0] != 'p' {
+			st.fail("expected p after function parameter scope count")
+		}
+		st.advance(1)
+		// We can see qualifiers here, but we don't include them
+		// in the demangled string.
+		st.cvQualifiers()
+		index := st.compactNumber()
+		return &FunctionParam{Index: index + 1}
 	} else if isDigit(st.str[0]) || (st.str[0] == 'o' && len(st.str) > 1 && st.str[1] == 'n') {
 		if st.str[0] == 'o' {
 			// Skip operator function ID.

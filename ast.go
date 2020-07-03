@@ -2161,15 +2161,28 @@ func (b *Binary) print(ps *printState) {
 
 	left := b.Left
 
-	// A function call in an expression should not print the types
-	// of the arguments.
+	// For a function call in an expression, don't print the types
+	// of the arguments unless there is a return type.
+	skipParens := false
 	if op != nil && op.Name == "()" {
 		if ty, ok := b.Left.(*Typed); ok {
-			left = ty.Name
+			if ft, ok := ty.Type.(*FunctionType); ok {
+				if ft.Return == nil {
+					left = ty.Name
+				} else {
+					skipParens = true
+				}
+			} else {
+				left = ty.Name
+			}
 		}
 	}
 
-	parenthesize(ps, left)
+	if skipParens {
+		ps.print(left)
+	} else {
+		parenthesize(ps, left)
+	}
 
 	if op != nil && op.Name == "[]" {
 		ps.writeByte('[')
@@ -2999,6 +3012,83 @@ func (s *Special2) goString(indent int, field string) string {
 	return fmt.Sprintf("%*s%sSpecial2: Prefix: %s\n%s\n%*sMiddle: %s\n%s", indent, "", field,
 		s.Prefix, s.Val1.goString(indent+2, "Val1: "),
 		indent+2, "", s.Middle, s.Val2.goString(indent+2, "Val2: "))
+}
+
+// EnableIf is used by clang for an enable_if attribute.
+type EnableIf struct {
+	Type AST
+	Args []AST
+}
+
+func (ei *EnableIf) print(ps *printState) {
+	ps.print(ei.Type)
+	ps.writeString(" [enable_if:")
+	first := true
+	for _, a := range ei.Args {
+		if !first {
+			ps.writeString(", ")
+		}
+		ps.print(a)
+		first = false
+	}
+	ps.writeString("]")
+}
+
+func (ei *EnableIf) Traverse(fn func(AST) bool) {
+	if fn(ei) {
+		ei.Type.Traverse(fn)
+		for _, a := range ei.Args {
+			a.Traverse(fn)
+		}
+	}
+}
+
+func (ei *EnableIf) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(ei) {
+		return nil
+	}
+	typ := ei.Type.Copy(fn, skip)
+	argsChanged := false
+	args := make([]AST, len(ei.Args))
+	for i, a := range ei.Args {
+		ac := a.Copy(fn, skip)
+		if ac == nil {
+			args[i] = a
+		} else {
+			args[i] = ac
+			argsChanged = true
+		}
+	}
+	if typ == nil && !argsChanged {
+		return fn(ei)
+	}
+	if typ == nil {
+		typ = ei.Type
+	}
+	ei = &EnableIf{Type: typ, Args: args}
+	if r := fn(ei); r != nil {
+		return r
+	}
+	return ei
+}
+
+func (ei *EnableIf) GoString() string {
+	return ei.goString(0, "")
+}
+
+func (ei *EnableIf) goString(indent int, field string) string {
+	var args string
+	if len(ei.Args) == 0 {
+		args = fmt.Sprintf("%*sArgs: nil", indent+2, "")
+	} else {
+		args = fmt.Sprintf("%*sArgs:", indent+2, "")
+		for i, a := range ei.Args {
+			args += "\n"
+			args += a.goString(indent+4, fmt.Sprintf("%d: ", i))
+		}
+	}
+	return fmt.Sprintf("%*s%sEnableIf:\n%s\n%s", indent, "", field,
+		ei.Type.goString(indent+2, "Type: "), args)
 }
 
 // Print the inner types.

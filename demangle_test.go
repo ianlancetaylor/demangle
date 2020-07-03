@@ -281,6 +281,14 @@ func TestDemangler(t *testing.T) {
 			"A::B::C(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F const&, bool, bool, int*)::{lambda(A::B::C(A::D*, A::E const&, int, A::E const&, auto:1, auto:1, auto:1, std::__u::F const&, bool, bool, int*)::G, A::B::C(A::D*, A::E const&, int, A::E const&, auto:1, auto:1, auto:1, std::__u::F const&, bool, bool, int*)::G)#1}::operator()(A::B::C(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F const&, bool, bool, int*)::G, A::B::C(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F const&, bool, bool, int*)::G) const",
 			"A::B::C(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F const&, bool, bool, int*)::{lambda(A::B::C(A::D*, A::E const&, int, A::E const&, auto:1, auto:1, auto:1, std::__u::F const&, bool, bool, int*)::G, A::B::C(A::D*, A::E const&, int, A::E const&, auto:1, auto:1, auto:1, std::__u::F const&, bool, bool, int*)::G)#1}::operator()",
 		},
+		{
+			"_ZN1A1B1CIJLNS_1DE131067ELS2_4EEEC2EUa9enable_ifIXclL_ZNS0_1EIJLS2_131067ELS2_4EEEEbNSt1F1GIcNS5_1HIcEEEEEfL0p_EEEPKc",
+			"A::B::C<(A::D)131067, (A::D)4>::C(char const*) [enable_if:bool A::B::E<(A::D)131067, (A::D)4>(std::F::G<char, std::F::H<char> >)({parm#1})]",
+			"A::B::C<(A::D)131067, (A::D)4>::C",
+			"A::B::C::C(char const*) [enable_if:bool A::B::E(std::F::G)({parm#1})]",
+			"A::B::C::C",
+		},
+
 	}
 
 	for _, test := range tests {
