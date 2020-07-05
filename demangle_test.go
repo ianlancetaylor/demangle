@@ -288,7 +288,13 @@ func TestDemangler(t *testing.T) {
 			"A::B::C::C(char const*) [enable_if:bool A::B::E(std::F::G)({parm#1})]",
 			"A::B::C::C",
 		},
-
+		{
+			"_ZNK1A1B1C1DINS0_1EIKZNK1F1G1HIJNS4_1IINSt1J1KIcNS8_1LIcEENS8_1MIcEEEEEENS4_1NIixEEEE1OEvEUlRT_E_EERKNS8_1PIJNS4_1QISF_EENSP_ISH_EEEEEEclILm0EEEDTcldtclL_ZNS8_1RIRKSN_EEDTclsr3std1SE1TISJ_ELi0EEEvEEonclIXT_EEcl1UIXT_EEclL_ZNSX_ISU_EES10_vEEEEEv",
+			"decltype (((decltype (std::S::T<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(0ul&)#1} const&>(0)) std::J::R<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(0ul&)#1} const&>()()).(operator()<0ul>))((U<0ul>)(F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(std::J::P<F::Q<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > > >, std::J::P<F::N<int, long long> > > const&)#1} const& A::B::C::D<A::B::E<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(0ul&)#1} const>, std::J::P<F::Q<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > > >, std::J::P<F::N<int, long long> > > const&>::operator()<std::J::P<F::Q<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > > >, std::J::P<F::N<int, long long> > > const>()()))) A::B::C::D<A::B::E<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(auto:1&)#1} const>, std::J::P<F::Q<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > > >, std::J::P<F::N<int, long long> > > const&>::operator()<0ul>() const",
+			"A::B::C::D<A::B::E<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(auto:1&)#1} const>, std::J::P<F::Q<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > > >, std::J::P<F::N<int, long long> > > const&>::operator()<0ul>",
+			"decltype (((decltype (std::S::T(0)) std::J::R()()).(operator()))((U)(F::G::H::O() const::{lambda(std::J::P const&)#1} const& A::B::C::D::operator()()()))) A::B::C::D::operator()() const",
+			"A::B::C::D::operator()",
+		},
 	}
 
 	for _, test := range tests {

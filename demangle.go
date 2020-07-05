@@ -1940,61 +1940,7 @@ func (st *state) expression() AST {
 	} else if st.str[0] == 'T' {
 		return st.templateParam()
 	} else if st.str[0] == 's' && len(st.str) > 1 && st.str[1] == 'r' {
-		st.advance(2)
-		if len(st.str) == 0 {
-			st.fail("expected unresolved type")
-		}
-		switch st.str[0] {
-		case 'T', 'D', 'S':
-			t := st.demangleType(false)
-			n := st.baseUnresolvedName()
-			n = &Qualified{Scope: t, Name: n, LocalName: false}
-			if len(st.str) > 0 && st.str[0] == 'I' {
-				args := st.templateArgs()
-				n = &Template{Name: n, Args: args}
-			}
-			return n
-		default:
-			var s AST
-			if st.str[0] == 'N' {
-				st.advance(1)
-				s = st.demangleType(false)
-			}
-			for len(st.str) == 0 || st.str[0] != 'E' {
-				// GCC does not seem to follow the ABI here.
-				// It can emit type/name without an 'E'.
-				if s != nil && len(st.str) > 0 && !isDigit(st.str[0]) {
-					if q, ok := s.(*Qualified); ok {
-						a := q.Scope
-						if t, ok := a.(*Template); ok {
-							st.subs.add(t.Name)
-							st.subs.add(t)
-						} else {
-							st.subs.add(a)
-						}
-						return s
-					}
-				}
-				n := st.sourceName()
-				if len(st.str) > 0 && st.str[0] == 'I' {
-					st.subs.add(n)
-					args := st.templateArgs()
-					n = &Template{Name: n, Args: args}
-				}
-				if s == nil {
-					s = n
-				} else {
-					s = &Qualified{Scope: s, Name: n, LocalName: false}
-				}
-				st.subs.add(s)
-			}
-			if s == nil {
-				st.fail("missing scope in unresolved name")
-			}
-			st.advance(1)
-			n := st.baseUnresolvedName()
-			return &Qualified{Scope: s, Name: n, LocalName: false}
-		}
+		return st.unresolvedName()
 	} else if st.str[0] == 's' && len(st.str) > 1 && st.str[1] == 'p' {
 		st.advance(2)
 		e := st.expression()
@@ -2110,7 +2056,7 @@ func (st *state) expression() AST {
 			if code == "cl" {
 				right = st.exprList('E')
 			} else if code == "dt" || code == "pt" {
-				right, _ = st.unqualifiedName()
+				right = st.unresolvedName()
 				if len(st.str) > 0 && st.str[0] == 'I' {
 					args := st.templateArgs()
 					right = &Template{Name: right, Args: args}
@@ -2160,6 +2106,81 @@ func (st *state) expression() AST {
 			st.fail(fmt.Sprintf("unsupported number of operator arguments: %d", args))
 			panic("not reached")
 		}
+	}
+}
+
+// <unresolved-name> ::= [gs] <base-unresolved-name>
+//                   ::= sr <unresolved-type> <base-unresolved-name>
+//                   ::= srN <unresolved-type> <unresolved-qualifier-level>+ E <base-unresolved-name>
+//                   ::= [gs] sr <unresolved-qualifier-level>+ E <base-unresolved-name>
+func (st *state) unresolvedName() AST {
+	if len(st.str) >= 2 && st.str[:2] == "gs" {
+		st.advance(2)
+		n := st.unresolvedName()
+		return &Unary{
+			Op:         &Operator{Name: "::"},
+			Expr:       n,
+			Suffix:     false,
+			SizeofType: false,
+		}
+	} else if len(st.str) >= 2 && st.str[:2] == "sr" {
+		st.advance(2)
+		if len(st.str) == 0 {
+			st.fail("expected unresolved type")
+		}
+		switch st.str[0] {
+		case 'T', 'D', 'S':
+			t := st.demangleType(false)
+			n := st.baseUnresolvedName()
+			n = &Qualified{Scope: t, Name: n, LocalName: false}
+			if len(st.str) > 0 && st.str[0] == 'I' {
+				args := st.templateArgs()
+				n = &Template{Name: n, Args: args}
+			}
+			return n
+		default:
+			var s AST
+			if st.str[0] == 'N' {
+				st.advance(1)
+				s = st.demangleType(false)
+			}
+			for len(st.str) == 0 || st.str[0] != 'E' {
+				// GCC does not seem to follow the ABI here.
+				// It can emit type/name without an 'E'.
+				if s != nil && len(st.str) > 0 && !isDigit(st.str[0]) {
+					if q, ok := s.(*Qualified); ok {
+						a := q.Scope
+						if t, ok := a.(*Template); ok {
+							st.subs.add(t.Name)
+							st.subs.add(t)
+						} else {
+							st.subs.add(a)
+						}
+						return s
+					}
+				}
+				n := st.sourceName()
+				if len(st.str) > 0 && st.str[0] == 'I' {
+					st.subs.add(n)
+					args := st.templateArgs()
+					n = &Template{Name: n, Args: args}
+				}
+				if s == nil {
+					s = n
+				} else {
+					s = &Qualified{Scope: s, Name: n, LocalName: false}
+				}
+				st.subs.add(s)
+			}
+			if s == nil {
+				st.fail("missing scope in unresolved name")
+			}
+			st.advance(1)
+			n := st.baseUnresolvedName()
+			return &Qualified{Scope: s, Name: n, LocalName: false}
+		}
+	} else {
+		return st.baseUnresolvedName()
 	}
 }
 
