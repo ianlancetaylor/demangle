@@ -327,8 +327,11 @@ func (st *state) encoding(params bool, local forLocalNameType) AST {
 			template, _ = n.(*Template)
 		}
 	}
+	var oldInLambda int
 	if template != nil {
 		st.templates = append(st.templates, template)
+		oldInLambda = st.inLambda
+		st.inLambda = 0
 	}
 
 	// Checking for the enable_if attribute here is what the LLVM
@@ -345,6 +348,7 @@ func (st *state) encoding(params bool, local forLocalNameType) AST {
 
 	if template != nil {
 		st.templates = st.templates[:len(st.templates)-1]
+		st.inLambda = oldInLambda
 	}
 
 	ft = simplify(ft)
@@ -2515,6 +2519,7 @@ func (st *state) substitution(forPrefix bool) AST {
 		// When copying a Typed we may need to adjust
 		// the templates.
 		copyTemplates := st.templates
+		var oldInLambda []int
 
 		copy := func(a AST) AST {
 			var index int
@@ -2523,7 +2528,13 @@ func (st *state) substitution(forPrefix bool) AST {
 				// Remove the template added in skip.
 				if _, ok := a.Name.(*Template); ok {
 					copyTemplates = copyTemplates[:len(copyTemplates)-1]
+					st.inLambda = oldInLambda[len(oldInLambda)-1]
+					oldInLambda = oldInLambda[:len(oldInLambda)-1]
 				}
+				return nil
+			case *Closure:
+				// Undo the decrement in skip.
+				st.inLambda--
 				return nil
 			case *TemplateParam:
 				index = a.Index
@@ -2564,8 +2575,13 @@ func (st *state) substitution(forPrefix bool) AST {
 				if template, ok := a.Name.(*Template); ok {
 					// This template is removed in copy.
 					copyTemplates = append(copyTemplates, template)
+					oldInLambda = append(oldInLambda, st.inLambda)
+					st.inLambda = 0
 				}
 				return false
+			case *Closure:
+				// This is decremented in copy.
+				st.inLambda++
 			case *TemplateParam, *LambdaAuto:
 				return false
 			}
