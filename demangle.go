@@ -2182,6 +2182,7 @@ func (st *state) unresolvedName() AST {
 			if len(st.str) > 0 && st.str[0] == 'I' {
 				args := st.templateArgs()
 				n = &Template{Name: n, Args: args}
+				st.subs.add(n)
 			}
 			return n
 		default:
@@ -2598,6 +2599,7 @@ func (st *state) substitution(forPrefix bool) AST {
 
 		if len(st.str) > 0 && st.str[0] == 'B' {
 			a = st.taggedName(a)
+			st.subs.add(a)
 		}
 
 		return a
