@@ -798,13 +798,16 @@ var operators = map[string]operator{
 	"cm": {",", 2},
 	"co": {"~", 1},
 	"dV": {"/=", 2},
+	"dX": {"[...]=", 3},
 	"da": {"delete[] ", 1},
 	"dc": {"dynamic_cast", 2},
 	"de": {"*", 1},
+	"di": {"=", 2},
 	"dl": {"delete ", 1},
 	"ds": {".*", 2},
 	"dt": {".", 2},
 	"dv": {"/", 2},
+	"dx": {"]=", 2},
 	"eO": {"^=", 2},
 	"eo": {"^", 2},
 	"eq": {"==", 2},
@@ -1918,12 +1921,47 @@ func (st *state) exprList(stop byte) AST {
 // <expression> ::= <(unary) operator-name> <expression>
 //              ::= <(binary) operator-name> <expression> <expression>
 //              ::= <(trinary) operator-name> <expression> <expression> <expression>
+//              ::= pp_ <expression>
+//              ::= mm_ <expression>
 //              ::= cl <expression>+ E
+//              ::= cl <expression>+ E
+//              ::= cv <type> <expression>
+//              ::= cv <type> _ <expression>* E
+//              ::= tl <type> <braced-expression>* E
+//              ::= il <braced-expression>* E
+//              ::= [gs] nw <expression>* _ <type> E
+//              ::= [gs] nw <expression>* _ <type> <initializer>
+//              ::= [gs] na <expression>* _ <type> E
+//              ::= [gs] na <expression>* _ <type> <initializer>
+//              ::= [gs] dl <expression>
+//              ::= [gs] da <expression>
+//              ::= dc <type> <expression>
+//              ::= sc <type> <expression>
+//              ::= cc <type> <expression>
+//              ::= rc <type> <expression>
+//              ::= ti <type>
+//              ::= te <expression>
 //              ::= st <type>
+//              ::= sz <expression>
+//              ::= at <type>
+//              ::= az <expression>
+//              ::= nx <expression>
 //              ::= <template-param>
 //              ::= <function-param>
-//              ::= sr <type> <unqualified-name>
-//              ::= sr <type> <unqualified-name> <template-args>
+//              ::= dt <expression> <unresolved-name>
+//              ::= pt <expression> <unresolved-name>
+//              ::= ds <expression> <expression>
+//              ::= sZ <template-param>
+//              ::= sZ <function-param>
+//              ::= sP <template-arg>* E
+//              ::= sp <expression>
+//              ::= fl <binary operator-name> <expression>
+//              ::= fr <binary operator-name> <expression>
+//              ::= fL <binary operator-name> <expression> <expression>
+//              ::= fR <binary operator-name> <expression> <expression>
+//              ::= tw <expression>
+//              ::= tr
+//              ::= <unresolved-name>
 //              ::= <expr-primary>
 //
 // <function-param> ::= fp <CV-qualifiers> _
@@ -1931,6 +1969,12 @@ func (st *state) exprList(stop byte) AST {
 //                  ::= fL <number> p <CV-qualifiers> _
 //                  ::= fL <number> p <CV-qualifiers> <number>
 //                  ::= fpT
+//
+// <braced-expression> ::= <expression>
+//                     ::= di <field source-name> <braced-expression>
+//                     ::= dx <index expression> <braced-expression>
+//                     ::= dX <range begin expression> <range end expression> <braced-expression>
+//
 func (st *state) expression() AST {
 	if len(st.str) == 0 {
 		st.fail("expected expression")
@@ -2050,6 +2094,8 @@ func (st *state) expression() AST {
 				left, _ = st.operatorName(true)
 				right = st.expression()
 				return &Fold{Left: code[1] == 'l', Op: left, Arg1: right, Arg2: nil}
+			} else if code == "di" {
+				left, _ = st.unqualifiedName()
 			} else {
 				left = st.expression()
 			}

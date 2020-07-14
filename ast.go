@@ -2132,6 +2132,22 @@ func (u *Unary) goString(indent int, field string) string {
 		u.Expr.goString(indent+2, "Expr: "))
 }
 
+// isDesignatedInitializer reports whether x is a designated
+// initializer.
+func isDesignatedInitializer(x AST) bool {
+	switch x := x.(type) {
+	case *Binary:
+		if op, ok := x.Op.(*Operator); ok {
+			return op.Name == "=" || op.Name == "]="
+		}
+	case *Trinary:
+		if op, ok := x.Op.(*Operator); ok {
+			return op.Name == "[...]="
+		}
+	}
+	return false
+}
+
 // Binary is a binary operation in an expression.
 type Binary struct {
 	Op    AST
@@ -2149,6 +2165,27 @@ func (b *Binary) print(ps *printState) {
 		ps.writeString(">(")
 		ps.print(b.Right)
 		ps.writeByte(')')
+		return
+	}
+
+	if isDesignatedInitializer(b) {
+		if op.Name == "=" {
+			ps.writeByte('.')
+		} else {
+			ps.writeByte('[')
+		}
+		ps.print(b.Left)
+		if op.Name == "]=" {
+			ps.writeByte(']')
+		}
+		if isDesignatedInitializer(b.Right) {
+			// Don't add anything between designated
+			// initializer chains.
+			ps.print(b.Right)
+		} else {
+			ps.writeByte('=')
+			parenthesize(ps, b.Right)
+		}
 		return
 	}
 
@@ -2260,6 +2297,23 @@ type Trinary struct {
 }
 
 func (t *Trinary) print(ps *printState) {
+	if isDesignatedInitializer(t) {
+		ps.writeByte('[')
+		ps.print(t.First)
+		ps.writeString(" ... ")
+		ps.print(t.Second)
+		ps.writeByte(']')
+		if isDesignatedInitializer(t.Third) {
+			// Don't add anything between designated
+			// initializer chains.
+			ps.print(t.Third)
+		} else {
+			ps.writeByte('=')
+			parenthesize(ps, t.Third)
+		}
+		return
+	}
+
 	parenthesize(ps, t.First)
 	ps.writeByte('?')
 	parenthesize(ps, t.Second)
