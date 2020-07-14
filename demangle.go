@@ -799,6 +799,9 @@ var operators = map[string]operator{
 	"az": {"alignof ", 1},
 	"cc": {"const_cast", 2},
 	"cl": {"()", 2},
+	"cp": {"()", 2}, // not in ABI but used by clang "when the
+			 // call would use ADL except for being
+			 // parenthesized."
 	"cm": {",", 2},
 	"co": {"~", 1},
 	"dV": {"/=", 2},
@@ -2103,7 +2106,7 @@ func (st *state) expression() AST {
 			} else {
 				left = st.expression()
 			}
-			if code == "cl" {
+			if code == "cl" || code == "cp" {
 				right = st.exprList('E')
 			} else if code == "dt" || code == "pt" {
 				right = st.unresolvedName()
