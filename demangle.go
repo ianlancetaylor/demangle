@@ -2359,9 +2359,7 @@ func (st *state) closureTypeName() AST {
 	}
 	st.advance(1)
 	num := st.compactNumber()
-	ret := &Closure{Types: types, Num: num}
-	st.subs.add(ret)
-	return ret
+	return &Closure{Types: types, Num: num}
 }
 
 // <unnamed-type-name> ::= Ut [ <nonnegative number> ] _
