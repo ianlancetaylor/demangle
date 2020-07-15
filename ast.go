@@ -22,7 +22,10 @@ type AST interface {
 	// Copy an AST with possible transformations.
 	// If the skip function returns true, no copy is required.
 	// If the copy function returns nil, no copy is required.
-	// Otherwise the AST returned by copy is used in a copy of the full AST.
+	// The Copy method will do the right thing if copy returns nil
+	// for some components of an AST but not others, so a good
+	// copy function will only return non-nil for AST values that
+	// need to change.
 	// Copy itself returns either a copy or nil.
 	Copy(copy func(AST) AST, skip func(AST) bool) AST
 
