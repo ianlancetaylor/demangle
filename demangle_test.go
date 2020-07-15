@@ -302,6 +302,13 @@ func TestDemangler(t *testing.T) {
 			"void A::B::C(A::B::K*)",
 			"A::B::C",
 		},
+		{
+			"_ZN1A1BIJNS_1C1DIJNS_1EENS_1FEEEEENSt1G1HIcNS6_1IIcEENS6_1JIcEEEEEEDTcl1KINS1_1KIsr1LIT0_EE1NJNS1_1MIJDpT_EE1NEEE1N1NEEcldtfp_1OEfp0_EERKNS_1PISE_EEPKc",
+			"decltype ((K<A::C::K<short, L<std::G::H<char, std::G::I<char>, std::G::J<char> > > restrict>::N<A::C::M<A::C::D<A::E, A::F> >::N>::N::N>)(({parm#1}.O)(), {parm#2})) A::B<A::C::D<A::E, A::F>, std::G::H<char, std::G::I<char>, std::G::J<char> > >(A::P<L> const&, char const*)",
+			"A::B<A::C::D<A::E, A::F>, std::G::H<char, std::G::I<char>, std::G::J<char> > >",
+			"decltype ((K)(({parm#1}.O)(), {parm#2})) A::B(A::P const&, char const*)",
+			"A::B",
+		},
 	}
 
 	for _, test := range tests {

@@ -649,6 +649,29 @@ func (st *state) prefix() AST {
 				// gives appropriate output.
 				st.advance(1)
 				continue
+			case 'J':
+				// It appears that in some cases clang
+				// can emit a J for a template arg
+				// without the expected I.  I don't
+				// know when this happens, but I've
+				// seen it in some large C++ programs.
+				if a == nil {
+					st.fail("unexpected template arguments")
+				}
+				var args []AST
+				for len(st.str) == 0 || st.str[0] != 'E' {
+					arg := st.templateArg()
+					args = append(args, arg)
+				}
+				st.advance(1)
+				tmpl := &Template{Name: a, Args: args}
+				if isCast {
+					st.setTemplate(a, tmpl)
+					st.clearTemplateArgs(args)
+					isCast = false
+				}
+				a = nil
+				next = tmpl
 			default:
 				st.fail("unrecognized letter in prefix")
 			}
