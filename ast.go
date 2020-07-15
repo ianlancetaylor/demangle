@@ -5,7 +5,6 @@
 package demangle
 
 import (
-	"bytes"
 	"fmt"
 	"strings"
 )
@@ -51,7 +50,7 @@ func ASTToString(a AST, options ...Option) string {
 type printState struct {
 	tparams bool // whether to print template parameters
 
-	buf  bytes.Buffer
+	buf  strings.Builder
 	last byte // Last byte written to buffer.
 
 	// The inner field is a list of items to print for a type
