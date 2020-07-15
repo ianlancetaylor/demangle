@@ -822,9 +822,9 @@ var operators = map[string]operator{
 	"az": {"alignof ", 1},
 	"cc": {"const_cast", 2},
 	"cl": {"()", 2},
-	"cp": {"()", 2}, // not in ABI but used by clang "when the
-			 // call would use ADL except for being
-			 // parenthesized."
+	// cp is not in the ABI but is used by clang "when the call
+	// would use ADL except for being parenthesized."
+	"cp": {"()", 2},
 	"cm": {",", 2},
 	"co": {"~", 1},
 	"dV": {"/=", 2},

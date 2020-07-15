@@ -408,7 +408,7 @@ type LambdaAuto struct {
 func (la *LambdaAuto) print(ps *printState) {
 	// We print the index plus 1 because that is what the standard
 	// demangler does.
-	fmt.Fprintf(&ps.buf, "auto:%d", la.Index + 1)
+	fmt.Fprintf(&ps.buf, "auto:%d", la.Index+1)
 }
 
 func (la *LambdaAuto) Traverse(fn func(AST) bool) {

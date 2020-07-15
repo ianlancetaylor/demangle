@@ -26,7 +26,7 @@ var exceptions = map[string]bool{
 	// The standard demangler seems to have a bug in which
 	// template it uses when a reference or rvalue-reference
 	// refers to a substitution that resolves to a template parameter.
-	"_ZN3mdr16in_cached_threadIRZNK4cudr6GPUSet17parallel_for_eachIZN5tns3d20shape_representation7compute7GPUImpl7executeERKNS_1AINS_7ptr_refIKjEELl3ELl3ENS_8c_strideILl1ELl0EEEEERKNS8_INS9_IjEELl4ELl1ESD_EEEUliRKNS1_7ContextERNS7_5StateEE_JSt6vectorISO_SaISO_EEEEEvOT_DpRT0_EUlSP_E_JSt17reference_wrapperISO_EEEENS_12ScopedFutureIDTclfp_spcl7forwardISW_Efp0_EEEEESV_DpOSW_":                                                        true,
+	"_ZN3mdr16in_cached_threadIRZNK4cudr6GPUSet17parallel_for_eachIZN5tns3d20shape_representation7compute7GPUImpl7executeERKNS_1AINS_7ptr_refIKjEELl3ELl3ENS_8c_strideILl1ELl0EEEEERKNS8_INS9_IjEELl4ELl1ESD_EEEUliRKNS1_7ContextERNS7_5StateEE_JSt6vectorISO_SaISO_EEEEEvOT_DpRT0_EUlSP_E_JSt17reference_wrapperISO_EEEENS_12ScopedFutureIDTclfp_spcl7forwardISW_Efp0_EEEEESV_DpOSW_": true,
 	"_ZNSt9_Any_data9_M_accessIPZN3sel8Selector6SetObjI3FooJPKcMS4_FviEEEEvRT_DpT0_EUlvE_EESA_v":                                                                                                                   true,
 	"_ZNSt9_Any_data9_M_accessIPZN13ThreadManager7newTaskIRSt5_BindIFSt7_Mem_fnIM5DiaryFivEEPS5_EEIEEESt6futureINSt9result_ofIFT_DpT0_EE4typeEEOSF_DpOSG_EUlvE_EERSF_v":                                            true,
 	"_ZNSt9_Any_data9_M_accessIPZN6cereal18polymorphic_detail15getInputBindingINS1_16JSONInputArchiveEEENS1_6detail15InputBindingMapIT_E11SerializersERS7_jEUlPvRSt10unique_ptrIvNS5_12EmptyDeleterIvEEEE0_EESA_v": true,
@@ -40,8 +40,8 @@ var exceptions = map[string]bool{
 
 	// These exceptions are because we handle recursion differently,
 	// and permit some cases that the standard demangler blocks.
-	"_Z1KMMMMMMMMMMMMMMMA_xooooooooooooooo": true,
-	"_ZdvMMMMMMMMMMMMMrrrrA_DTdvfp_fp_Eededilfdfdfdfd": true,
+	"_Z1KMMMMMMMMMMMMMMMA_xooooooooooooooo":                      true,
+	"_ZdvMMMMMMMMMMMMMrrrrA_DTdvfp_fp_Eededilfdfdfdfd":           true,
 	"_Z1MA_aMMMMA_MMA_MMMMMMMMSt1MS_o11T0000000000t2M0oooozoooo": true,
 }
 
