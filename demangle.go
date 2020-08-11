@@ -2547,15 +2547,25 @@ func (st *state) substitution(forPrefix bool) AST {
 		copyTemplates := st.templates
 		var oldInLambda []int
 
+		// pushTemplate is called from skip, popTemplate from copy.
+		pushTemplate := func(template *Template) {
+			copyTemplates = append(copyTemplates, template)
+			oldInLambda = append(oldInLambda, st.inLambda)
+			st.inLambda = 0
+		}
+		popTemplate := func() {
+			copyTemplates = copyTemplates[:len(copyTemplates)-1]
+			st.inLambda = oldInLambda[len(oldInLambda)-1]
+			oldInLambda = oldInLambda[:len(oldInLambda)-1]
+		}
+
 		copy := func(a AST) AST {
 			var index int
 			switch a := a.(type) {
 			case *Typed:
 				// Remove the template added in skip.
 				if _, ok := a.Name.(*Template); ok {
-					copyTemplates = copyTemplates[:len(copyTemplates)-1]
-					st.inLambda = oldInLambda[len(oldInLambda)-1]
-					oldInLambda = oldInLambda[:len(oldInLambda)-1]
+					popTemplate()
 				}
 				return nil
 			case *Closure:
@@ -2600,9 +2610,7 @@ func (st *state) substitution(forPrefix bool) AST {
 			case *Typed:
 				if template, ok := a.Name.(*Template); ok {
 					// This template is removed in copy.
-					copyTemplates = append(copyTemplates, template)
-					oldInLambda = append(oldInLambda, st.inLambda)
-					st.inLambda = 0
+					pushTemplate(template)
 				}
 				return false
 			case *Closure:
@@ -2619,6 +2627,13 @@ func (st *state) substitution(forPrefix bool) AST {
 			seen = append(seen, a)
 			return false
 		}
+
+		// At least with clang we can see a Template to start,
+		// not inside a Typed.
+		if template, ok := ret.(*Template); ok {
+			pushTemplate(template)
+		}
+
 		if c := ret.Copy(copy, skip); c != nil {
 			return c
 		}

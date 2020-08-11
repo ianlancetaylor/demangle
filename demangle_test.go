@@ -309,6 +309,13 @@ func TestDemangler(t *testing.T) {
 			"decltype ((K)(({parm#1}.O)(), {parm#2})) A::B(A::P const&, char const*)",
 			"A::B",
 		},
+		{
+			"_ZNSt1A1B1CIZN1D1E1F1GIZNS3_1H1IEixxE1JEENS_1KIFDTclclsr3stdE7declvalIT_EEEEvEEEPN1L1MENS_1OIcNS_1PIcEEEES9_EUlvE_FN1Q1RINS_1SIJNSD_1T1U1VENS6_1WEEEEEEvEEclEv",
+			"std::A::B::C<D::E::F::G<D::E::H::I(int, long long, long long)::J>(L::M*, std::A::O<char, std::A::P<char> >, std)::{lambda()#1}, Q::R<std::A::S<std::A::K<decltype ((std::declval<decltype ((std::declval<D::E::H::I(int, long long, long long)::J>())()) ()>())()) ()>::T::U::V, D::E::H::W> > ()>::operator()()",
+			"std::A::B::C<D::E::F::G<D::E::H::I(int, long long, long long)::J>(L::M*, std::A::O<char, std::A::P<char> >, std)::{lambda()#1}, Q::R<std::A::S<std::A::K<decltype ((std::declval<decltype ((std::declval<D::E::H::I(int, long long, long long)::J>())()) ()>())()) ()>::T::U::V, D::E::H::W> > ()>::operator()",
+			"std::A::B::C::operator()()",
+			"std::A::B::C::operator()",
+		},
 	}
 
 	for _, test := range tests {
