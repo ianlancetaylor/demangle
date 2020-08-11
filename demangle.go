@@ -2616,6 +2616,7 @@ func (st *state) substitution(forPrefix bool) AST {
 			case *Closure:
 				// This is decremented in copy.
 				st.inLambda++
+				return false
 			case *TemplateParam, *LambdaAuto:
 				return false
 			}
@@ -2632,6 +2633,7 @@ func (st *state) substitution(forPrefix bool) AST {
 		// not inside a Typed.
 		if template, ok := ret.(*Template); ok {
 			pushTemplate(template)
+			defer popTemplate()
 		}
 
 		if c := ret.Copy(copy, skip); c != nil {
