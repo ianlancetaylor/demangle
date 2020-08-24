@@ -316,6 +316,13 @@ func TestDemangler(t *testing.T) {
 			"std::A::B::C::operator()()",
 			"std::A::B::C::operator()",
 		},
+		{
+			"_ZNSt1A1B1CIFN1D1EIN1F1G1HEEERKNS5_1IEEE1JINS0_1KIZN1L1MINS2_1NIS8_S6_EENS5_12_GLOBAL__N_11OES8_S6_EEN1P1QINS_1RINSH_IT1_T2_EENS_1SISQ_EEEEEENS_1TIKT_EENSF_1UET0_EUlSA_E_SB_EEEES7_PKNS0_1VESA_",
+			"D::E<F::G::H> std::A::B::C<D::E<F::G::H> (F::G::I const&)>::J<std::A::B::K<L::M<D::N<F::G::I, F::G::H>, F::G::(anonymous namespace)::O, F::G::I, F::G::H>(std::A::T<D::N<F::G::I, F::G::H> const>, L::U, F::G::(anonymous namespace)::O)::{lambda(F::G::I const&)#1}, D::E<F::G::H> (F::G::I const&)> >(std::A::B::V const*, F::G::I const&)",
+			"std::A::B::C<D::E<F::G::H> (F::G::I const&)>::J<std::A::B::K<L::M<D::N<F::G::I, F::G::H>, F::G::(anonymous namespace)::O, F::G::I, F::G::H>(std::A::T<D::N<F::G::I, F::G::H> const>, L::U, F::G::(anonymous namespace)::O)::{lambda(F::G::I const&)#1}, D::E<F::G::H> (F::G::I const&)> >",
+			"D::E std::A::B::C::J(std::A::B::V const*, F::G::I const&)",
+			"std::A::B::C::J",
+		},
 	}
 
 	for _, test := range tests {

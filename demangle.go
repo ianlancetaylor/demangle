@@ -2588,10 +2588,18 @@ func (st *state) substitution(forPrefix bool) AST {
 				}
 				return &LambdaAuto{Index: index}
 			}
-			if len(copyTemplates) == 0 {
+			var template *Template
+			if len(copyTemplates) > 0 {
+				template = copyTemplates[len(copyTemplates)-1]
+			} else if rt, ok := ret.(*Template); ok {
+				// At least with clang we can see a template
+				// to start, and sometimes we need to refer
+				// to it. There is probably something wrong
+				// here.
+				template = rt
+			} else {
 				st.failEarlier("substituted template parameter not in scope of template", dec)
 			}
-			template := copyTemplates[len(copyTemplates)-1]
 			if template == nil {
 				// This template parameter is within
 				// the scope of a cast operator.
@@ -2627,13 +2635,6 @@ func (st *state) substitution(forPrefix bool) AST {
 			}
 			seen = append(seen, a)
 			return false
-		}
-
-		// At least with clang we can see a Template to start,
-		// not inside a Typed.
-		if template, ok := ret.(*Template); ok {
-			pushTemplate(template)
-			defer popTemplate()
 		}
 
 		if c := ret.Copy(copy, skip); c != nil {
