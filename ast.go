@@ -2082,6 +2082,11 @@ func (u *Unary) print(ps *printState) {
 			ps.writeByte('(')
 			ps.print(expr)
 			ps.writeByte(')')
+		} else if op, ok := u.Op.(*Operator); ok && op.Name == "__alignof__" {
+			// Always use parentheses for __alignof__ argument.
+			ps.writeByte('(')
+			ps.print(expr)
+			ps.writeByte(')')
 		} else {
 			parenthesize(ps, expr)
 		}
