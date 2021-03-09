@@ -2518,7 +2518,7 @@ func (so *Subobject) Copy(fn func(AST) AST, skip func(AST) bool) AST {
 	if subExpr == nil {
 		subExpr = so.SubExpr
 	}
-	so = &Subobject {
+	so = &Subobject{
 		Type:      typ,
 		SubExpr:   subExpr,
 		Offset:    so.Offset,
