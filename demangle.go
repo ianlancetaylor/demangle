@@ -2219,7 +2219,10 @@ func (st *state) subobject() AST {
 	var selectors []int
 	for len(st.str) > 0 && st.str[0] == '_' {
 		st.advance(1)
-		selector := st.number()
+		selector := 0
+		if len(st.str) > 0 && (st.str[0] == 'n' || isDigit(st.str[0])) {
+			selector = st.number()
+		}
 		selectors = append(selectors, selector)
 	}
 	pastEnd := false
