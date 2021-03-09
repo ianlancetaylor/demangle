@@ -50,6 +50,7 @@ var exceptions = map[string]bool{
 // the syntax.  We ignore all tests that are not --format=gnu-v3 or
 // --format=auto with a string starting with _Z.
 func TestExpected(t *testing.T) {
+	t.Parallel()
 	f, err := os.Open(filename)
 	if err != nil {
 		t.Fatal(err)

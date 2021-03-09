@@ -2549,6 +2549,70 @@ func (so *Subobject) goString(indent int, field string) string {
 		indent+2, "", so.PastEnd)
 }
 
+// PtrMemCast is a conversion of an expression to a pointer-to-member
+// type.  This is used for C++20 manglings of class types used as the
+// type of non-type template arguments.
+//
+// See https://github.com/itanium-cxx-abi/cxx-abi/issues/47.
+type PtrMemCast struct {
+	Type   AST
+	Expr   AST
+	Offset int
+}
+
+func (pmc *PtrMemCast) print(ps *printState) {
+	ps.writeString("(")
+	ps.print(pmc.Type)
+	ps.writeString(")(")
+	ps.print(pmc.Expr)
+	ps.writeString(")")
+}
+
+func (pmc *PtrMemCast) Traverse(fn func(AST) bool) {
+	if fn(pmc) {
+		pmc.Type.Traverse(fn)
+		pmc.Expr.Traverse(fn)
+	}
+}
+
+func (pmc *PtrMemCast) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(pmc) {
+		return nil
+	}
+	typ := pmc.Type.Copy(fn, skip)
+	expr := pmc.Expr.Copy(fn, skip)
+	if typ == nil && expr == nil {
+		return nil
+	}
+	if typ == nil {
+		typ = pmc.Type
+	}
+	if expr == nil {
+		expr = pmc.Expr
+	}
+	pmc = &PtrMemCast{
+		Type:   typ,
+		Expr:   expr,
+		Offset: pmc.Offset,
+	}
+	if r := fn(pmc); r != nil {
+		return r
+	}
+	return pmc
+}
+
+func (pmc *PtrMemCast) GoString() string {
+	return pmc.goString(0, "")
+}
+
+func (pmc *PtrMemCast) goString(indent int, field string) string {
+	return fmt.Sprintf("%*s%sPtrMemCast:\n%s\n%s\n%*sOffset: %d",
+		indent, "", field,
+		pmc.Type.goString(indent+2, "Type: "),
+		pmc.Expr.goString(indent+2, "Expr: "),
+		indent+2, "", pmc.Offset)
+}
+
 // New is a use of operator new in an expression.
 type New struct {
 	Op    AST

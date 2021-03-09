@@ -1968,6 +1968,7 @@ func (st *state) exprList(stop byte) AST {
 //              ::= dc <type> <expression>
 //              ::= sc <type> <expression>
 //              ::= cc <type> <expression>
+//              ::= mc <parameter type> <expr> [<offset number>] E
 //              ::= rc <type> <expression>
 //              ::= ti <type>
 //              ::= te <expression>
@@ -2067,6 +2068,23 @@ func (st *state) expression() AST {
 		st.cvQualifiers()
 		index := st.compactNumber()
 		return &FunctionParam{Index: index + 1}
+	} else if st.str[0] == 'm' && len(st.str) > 1 && st.str[1] == 'c' {
+		st.advance(2)
+		typ := st.demangleType(false)
+		expr := st.expression()
+		offset := 0
+		if len(st.str) > 0 && (st.str[0] == 'n' || isDigit(st.str[0])) {
+			offset = st.number()
+		}
+		if len(st.str) == 0 || st.str[0] != 'E' {
+			st.fail("expected E after pointer-to-member conversion")
+		}
+		st.advance(1)
+		return &PtrMemCast{
+			Type:   typ,
+			Expr:   expr,
+			Offset: offset,
+		}
 	} else if isDigit(st.str[0]) || (st.str[0] == 'o' && len(st.str) > 1 && st.str[1] == 'n') {
 		if st.str[0] == 'o' {
 			// Skip operator function ID.
