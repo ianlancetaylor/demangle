@@ -1971,6 +1971,7 @@ func (st *state) exprList(stop byte) AST {
 //              ::= rc <type> <expression>
 //              ::= ti <type>
 //              ::= te <expression>
+//              ::= so <referent type> <expr> [<offset number>] <union-selector>* [p] E
 //              ::= st <type>
 //              ::= sz <expression>
 //              ::= at <type>
@@ -2013,6 +2014,9 @@ func (st *state) expression() AST {
 		return st.exprPrimary()
 	} else if st.str[0] == 'T' {
 		return st.templateParam()
+	} else if st.str[0] == 's' && len(st.str) > 1 && st.str[1] == 'o' {
+		st.advance(2)
+		return st.subobject()
 	} else if st.str[0] == 's' && len(st.str) > 1 && st.str[1] == 'r' {
 		return st.unresolvedName()
 	} else if st.str[0] == 's' && len(st.str) > 1 && st.str[1] == 'p' {
@@ -2182,6 +2186,39 @@ func (st *state) expression() AST {
 			st.fail(fmt.Sprintf("unsupported number of operator arguments: %d", args))
 			panic("not reached")
 		}
+	}
+}
+
+// <expression> ::= so <referent type> <expr> [<offset number>] <union-selector>* [p] E
+// <union-selector> ::= _ [<number>]
+func (st *state) subobject() AST {
+	typ := st.demangleType(false)
+	expr := st.expression()
+	offset := 0
+	if len(st.str) > 0 && (st.str[0] == 'n' || isDigit(st.str[0])) {
+		offset = st.number()
+	}
+	var selectors []int
+	for len(st.str) > 0 && st.str[0] == '_' {
+		st.advance(1)
+		selector := st.number()
+		selectors = append(selectors, selector)
+	}
+	pastEnd := false
+	if len(st.str) > 0 && st.str[0] == 'p' {
+		st.advance(1)
+		pastEnd = true
+	}
+	if len(st.str) == 0 || st.str[0] != 'E' {
+		st.fail("expected E after subobject")
+	}
+	st.advance(1)
+	return &Subobject{
+		Type:      typ,
+		SubExpr:   expr,
+		Offset:    offset,
+		Selectors: selectors,
+		PastEnd:   pastEnd,
 	}
 }
 

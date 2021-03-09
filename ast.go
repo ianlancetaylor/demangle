@@ -2476,6 +2476,79 @@ func (f *Fold) goString(indent int, field string) string {
 	}
 }
 
+// Subobject is a a reference to an offset in an expression.  This is
+// used for C++20 manglings of class types used as the type of
+// non-type template arguments.
+//
+// See https://github.com/itanium-cxx-abi/cxx-abi/issues/47.
+type Subobject struct {
+	Type      AST
+	SubExpr   AST
+	Offset    int
+	Selectors []int
+	PastEnd   bool
+}
+
+func (so *Subobject) print(ps *printState) {
+	ps.print(so.SubExpr)
+	ps.writeString(".<")
+	ps.print(so.Type)
+	ps.writeString(fmt.Sprintf(" at offset %d>", so.Offset))
+}
+
+func (so *Subobject) Traverse(fn func(AST) bool) {
+	if fn(so) {
+		so.Type.Traverse(fn)
+		so.SubExpr.Traverse(fn)
+	}
+}
+
+func (so *Subobject) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(so) {
+		return nil
+	}
+	typ := so.Type.Copy(fn, skip)
+	subExpr := so.SubExpr.Copy(fn, skip)
+	if typ == nil && subExpr == nil {
+		return nil
+	}
+	if typ == nil {
+		typ = so.Type
+	}
+	if subExpr == nil {
+		subExpr = so.SubExpr
+	}
+	so = &Subobject {
+		Type:      typ,
+		SubExpr:   subExpr,
+		Offset:    so.Offset,
+		Selectors: so.Selectors,
+		PastEnd:   so.PastEnd,
+	}
+	if r := fn(so); r != nil {
+		return r
+	}
+	return so
+}
+
+func (so *Subobject) GoString() string {
+	return so.goString(0, "")
+}
+
+func (so *Subobject) goString(indent int, field string) string {
+	var selectors string
+	for _, s := range so.Selectors {
+		selectors += fmt.Sprintf(" %d", s)
+	}
+	return fmt.Sprintf("%*s%sSubobject:\n%s\n%s\n%*sOffset: %d\n%*sSelectors:%s\n%*sPastEnd: %t",
+		indent, "", field,
+		so.Type.goString(indent+2, "Type: "),
+		so.SubExpr.goString(indent+2, "SubExpr: "),
+		indent+2, "", so.Offset,
+		indent+2, "", selectors,
+		indent+2, "", so.PastEnd)
+}
+
 // New is a use of operator new in an expression.
 type New struct {
 	Op    AST
