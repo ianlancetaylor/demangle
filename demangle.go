@@ -186,6 +186,12 @@ type state struct {
 	subs      substitutions // substitutions
 	templates []*Template   // templates being processed
 	inLambda  int           // number of lambdas being parsed
+
+	// Counts of template parameters without template arguments,
+	// for lambdas.
+	typeTemplateParamCount     int
+	nonTypeTemplateParamCount  int
+	templateTemplateParamCount int
 }
 
 // copy returns a copy of the current state.
@@ -1798,6 +1804,8 @@ func (st *state) compactNumber() int {
 
 // <template-param> ::= T_
 //                  ::= T <(parameter-2 non-negative) number> _
+//                  ::= TL <level-1> __
+//                  ::= TL <level-1> _ <parameter-2 non-negative number> _
 //
 // When a template parameter is a substitution candidate, any
 // reference to that substitution refers to the template parameter
@@ -1805,12 +1813,15 @@ func (st *state) compactNumber() int {
 // whatever the template parameter would be expanded to here.  We sort
 // this out in substitution and simplify.
 func (st *state) templateParam() AST {
-	if len(st.templates) == 0 && st.inLambda == 0 {
-		st.fail("template parameter not in scope of template")
-	}
 	off := st.off
-
 	st.checkChar('T')
+
+	level := 0
+	if len(st.str) > 0 && st.str[0] == 'L' {
+		st.advance(1)
+		level = st.compactNumber()
+	}
+
 	n := st.compactNumber()
 
 	if st.inLambda > 0 {
@@ -1820,7 +1831,11 @@ func (st *state) templateParam() AST {
 		return &LambdaAuto{Index: n}
 	}
 
-	template := st.templates[len(st.templates)-1]
+	if level >= len(st.templates) {
+		st.failEarlier(fmt.Sprintf("template parameter is not in scope of template (level %d >= %d)", level, len(st.templates)), st.off-off)
+	}
+
+	template := st.templates[level]
 
 	if template == nil {
 		// We are parsing a cast operator.  If the cast is
@@ -2437,18 +2452,137 @@ func (st *state) discriminator(a AST) AST {
 }
 
 // <closure-type-name> ::= Ul <lambda-sig> E [ <nonnegative number> ] _
+// <lambda-sig> ::= <parameter type>+
 func (st *state) closureTypeName() AST {
 	st.checkChar('U')
 	st.checkChar('l')
-	st.inLambda++
+
+	oldInLambda := st.inLambda
+
+	var templateArgs []AST
+	var template *Template
+	for len(st.str) > 1 && st.str[0] == 'T' {
+		arg, templateVal := st.templateParamDecl()
+		if arg == nil {
+			break
+		}
+		templateArgs = append(templateArgs, arg)
+		if template == nil {
+			template = &Template{
+				Name: &Name{Name: "lambda"},
+			}
+			st.templates = append(st.templates, template)
+			st.inLambda = 0
+		}
+		template.Args = append(template.Args, templateVal)
+	}
+
+	if template == nil {
+		st.inLambda++
+	}
+
 	types := st.parmlist()
-	st.inLambda--
+
+	st.inLambda = oldInLambda
+
+	if template != nil {
+		st.templates = st.templates[:len(st.templates)-1]
+	}
+
 	if len(st.str) == 0 || st.str[0] != 'E' {
 		st.fail("expected E after closure type name")
 	}
 	st.advance(1)
 	num := st.compactNumber()
-	return &Closure{Types: types, Num: num}
+	return &Closure{TemplateArgs: templateArgs, Types: types, Num: num}
+}
+
+// <template-param-decl> ::= Ty                          # type parameter
+//                       ::= Tn <type>                   # non-type parameter
+//                       ::= Tt <template-param-decl>* E # template parameter
+//                       ::= Tp <template-param-decl>    # parameter pack
+//
+// Returns the new AST to include in the AST we are building and the
+// new AST to add to the list of template parameters.
+//
+// Returns nil, nil if not looking at a template-param-decl.
+func (st *state) templateParamDecl() (AST, AST) {
+	if len(st.str) < 2 || st.str[0] != 'T' {
+		return nil, nil
+	}
+	mk := func(prefix string, p *int) AST {
+		idx := *p
+		(*p)++
+		return &TemplateParamName{
+			Prefix: prefix,
+			Index: idx,
+		}
+	}
+	switch st.str[1] {
+	case 'y':
+		st.advance(2)
+		name := mk("$T", &st.typeTemplateParamCount)
+		tp := &TypeTemplateParam{
+			Name: name,
+		}
+		return tp, name
+	case 'n':
+		st.advance(2)
+		name := mk("$N", &st.nonTypeTemplateParamCount)
+		typ := st.demangleType(false)
+		tp := &NonTypeTemplateParam{
+			Name: name,
+			Type: typ,
+		}
+		return tp, name
+	case 't':
+		st.advance(2)
+		name := mk("$TT", &st.templateTemplateParamCount)
+		oldInLambda := st.inLambda
+		var params []AST
+		var template *Template
+		for {
+			if len(st.str) == 0 {
+				break
+			}
+			if st.str[0] == 'E' {
+				st.advance(1)
+				break
+			}
+			param, templateVal := st.templateParamDecl()
+			if param == nil {
+				break
+			}
+			params = append(params, param)
+			if template == nil {
+				template = &Template{
+					Name: &Name{Name: "template_template"},
+				}
+				st.templates = append(st.templates, template)
+				st.inLambda = 0
+			}
+			template.Args = append(template.Args, templateVal)
+		}
+		if template != nil {
+			st.templates = st.templates[:len(st.templates)-1]
+		}
+		st.inLambda = oldInLambda
+		tp := &TemplateTemplateParam{
+			Name:   name,
+			Params: params,
+		}
+		return tp, name
+	case 'p':
+		st.advance(2)
+		off := st.off
+		param, templateVal := st.templateParamDecl()
+		if param == nil {
+			st.failEarlier("expected lambda template parameter", st.off-off)
+		}
+		return &TemplateParamPack{Param: param}, templateVal
+	default:
+		return nil, nil
+	}
 }
 
 // <unnamed-type-name> ::= Ut [ <nonnegative number> ] _

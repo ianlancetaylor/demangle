@@ -1932,6 +1932,287 @@ func (sa *SizeofArgs) goString(indent int, field string) string {
 	return fmt.Sprintf("%*s%sSizeofArgs:\n%s", indent, "", field, args)
 }
 
+// TemplateParamName is the name of a template parameter that the
+// demangler introduced for a lambda that has explicit template
+// parameters.  This is a prefix with an index.
+type TemplateParamName struct {
+	Prefix string
+	Index  int
+}
+
+func (tpn *TemplateParamName) print(ps *printState) {
+	ps.writeString(tpn.Prefix)
+	if tpn.Index > 0 {
+		ps.writeString(fmt.Sprintf("%d", tpn.Index - 1))
+	}
+}
+
+func (tpn *TemplateParamName) Traverse(fn func(AST) bool) {
+	fn(tpn)
+}
+
+func (tpn *TemplateParamName) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(tpn) {
+		return nil
+	}
+	return fn(tpn)
+}
+
+func (tpn *TemplateParamName) GoString() string {
+	return tpn.goString(0, "")
+}
+
+func (tpn *TemplateParamName) goString(indent int, field string) string {
+	name := tpn.Prefix
+	if tpn.Index > 0 {
+		name += fmt.Sprintf("%d", tpn.Index - 1)
+	}
+	return fmt.Sprintf("%*s%sTemplateParamName: %s", indent, "", field, name)
+}
+
+// TypeTemplateParam is a type template parameter that appears in a
+// lambda with explicit template parameters.
+type TypeTemplateParam struct {
+	Name AST
+}
+
+func (ttp *TypeTemplateParam) print(ps *printState) {
+	ps.writeString("typename ")
+	ps.printInner(false)
+	ps.print(ttp.Name)
+}
+
+func (ttp *TypeTemplateParam) Traverse(fn func(AST) bool) {
+	if fn(ttp) {
+		ttp.Name.Traverse(fn)
+	}
+}
+
+func (ttp *TypeTemplateParam) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(ttp) {
+		return nil
+	}
+	name := ttp.Name.Copy(fn, skip)
+	if name == nil {
+		return fn(ttp)
+	}
+	ttp = &TypeTemplateParam{Name: name}
+	if r := fn(ttp); r != nil {
+		return r
+	}
+	return ttp
+}
+
+func (ttp *TypeTemplateParam) GoString() string {
+	return ttp.goString(0, "")
+}
+
+func (ttp *TypeTemplateParam) goString(indent int, field string) string {
+	return fmt.Sprintf("%*s%sTypeTemplateParam:\n%s", indent, "", field,
+		ttp.Name.goString(indent+2, "Name"))
+}
+
+// NonTypeTemplateParam is a non-type template parameter that appears
+// in a lambda with explicit template parameters.
+type NonTypeTemplateParam struct {
+	Name AST
+	Type AST
+}
+
+func (nttp *NonTypeTemplateParam) print(ps *printState) {
+	ps.inner = append(ps.inner, nttp)
+	ps.print(nttp.Type)
+	if len(ps.inner) > 0 {
+		ps.writeByte(' ')
+		ps.print(nttp.Name)
+		ps.inner = ps.inner[:len(ps.inner)-1]
+	}
+}
+
+func (nttp *NonTypeTemplateParam) printInner(ps *printState) {
+	ps.print(nttp.Name)
+}
+
+func (nttp *NonTypeTemplateParam) Traverse(fn func(AST) bool) {
+	if fn(nttp) {
+		nttp.Name.Traverse(fn)
+		nttp.Type.Traverse(fn)
+	}
+}
+
+func (nttp *NonTypeTemplateParam) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(nttp) {
+		return nil
+	}
+	name := nttp.Name.Copy(fn, skip)
+	typ := nttp.Type.Copy(fn, skip)
+	if name == nil && typ == nil {
+		return fn(nttp)
+	}
+	if name == nil {
+		name = nttp.Name
+	}
+	if typ == nil {
+		typ = nttp.Type
+	}
+	nttp = &NonTypeTemplateParam{Name: name, Type: typ}
+	if r := fn(nttp); r != nil {
+		return r
+	}
+	return nttp
+}
+
+func (nttp *NonTypeTemplateParam) GoString() string {
+	return nttp.goString(0, "")
+}
+
+func (nttp *NonTypeTemplateParam) goString(indent int, field string) string {
+	return fmt.Sprintf("%*s%sNonTypeTemplateParam:\n%s\n%s", indent, "", field,
+		nttp.Name.goString(indent+2, "Name: "),
+		nttp.Type.goString(indent+2, "Type: "))
+}
+
+// TemplateTemplateParam is a template template parameter that appears
+// in a lambda with explicit template parameters.
+type TemplateTemplateParam struct {
+	Name   AST
+	Params []AST
+}
+
+func (ttp *TemplateTemplateParam) print(ps *printState) {
+	ps.writeString("template<")
+	for i, param := range ttp.Params {
+		if i > 0 {
+			ps.writeString(", ")
+		}
+		ps.print(param)
+	}
+	ps.writeString("> typename ")
+	ps.print(ttp.Name)
+}
+
+func (ttp *TemplateTemplateParam) Traverse(fn func(AST) bool) {
+	if fn(ttp) {
+		ttp.Name.Traverse(fn)
+		for _, param := range ttp.Params {
+			param.Traverse(fn)
+		}
+	}
+}
+
+func (ttp *TemplateTemplateParam) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(ttp) {
+		return nil
+	}
+
+	changed := false
+
+	name := ttp.Name.Copy(fn, skip)
+	if name == nil {
+		name = ttp.Name
+	} else {
+		changed = true
+	}
+
+	params := make([]AST, len(ttp.Params))
+	for i, p := range ttp.Params {
+		pc := p.Copy(fn, skip)
+		if pc == nil {
+			params[i] = p
+		} else {
+			params[i] = pc
+			changed = true
+		}
+	}
+
+	if !changed {
+		return fn(ttp)
+	}
+
+	ttp = &TemplateTemplateParam{
+		Name:   name,
+		Params: params,
+	}
+	if r := fn(ttp); r != nil {
+		return r
+	}
+	return ttp
+}
+
+func (ttp *TemplateTemplateParam) GoString() string {
+	return ttp.goString(0, "")
+}
+
+func (ttp *TemplateTemplateParam) goString(indent int, field string) string {
+	var params strings.Builder
+	fmt.Fprintf(&params, "%*sParams:", indent+2, "")
+	for i, p := range ttp.Params {
+		params.WriteByte('\n')
+		params.WriteString(p.goString(indent+4, fmt.Sprintf("%d: ", i)))
+	}
+	return fmt.Sprintf("%*s%sTemplateTemplateParam:\n%s\n%s", indent, "", field,
+		ttp.Name.goString(indent+2, "Name: "),
+		params.String())
+}
+
+// TemplateParamPack is a template parameter pack that appears in a
+// lambda with explicit template parameters.
+type TemplateParamPack struct {
+	Param AST
+}
+
+func (tpp *TemplateParamPack) print(ps *printState) {
+	holdInner := ps.inner
+	defer func() { ps.inner = holdInner }()
+
+	ps.inner = []AST{tpp}
+	if nttp, ok := tpp.Param.(*NonTypeTemplateParam); ok {
+		ps.print(nttp.Type)
+	} else {
+		ps.print(tpp.Param)
+	}
+	if len(ps.inner) > 0 {
+		ps.writeString("...")
+	}
+}
+
+func (tpp *TemplateParamPack) printInner(ps *printState) {
+	ps.writeString("...")
+	if nttp, ok := tpp.Param.(*NonTypeTemplateParam); ok {
+		ps.print(nttp.Name)
+	}
+}
+
+func (tpp *TemplateParamPack) Traverse(fn func(AST) bool) {
+	if fn(tpp) {
+		tpp.Param.Traverse(fn)
+	}
+}
+
+func (tpp *TemplateParamPack) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(tpp) {
+		return nil
+	}
+	param := tpp.Param.Copy(fn, skip)
+	if param == nil {
+		return fn(tpp)
+	}
+	tpp = &TemplateParamPack{Param: param}
+	if r := fn(tpp); r != nil {
+		return r
+	}
+	return tpp
+}
+
+func (tpp *TemplateParamPack) GoString() string {
+	return tpp.goString(0, "")
+}
+
+func (tpp *TemplateParamPack) goString(indent int, field string) string {
+	return fmt.Sprintf("%*s%sTemplateParamPack:\n%s", indent, "", field,
+		tpp.Param.goString(indent+2, "Param: "))
+}
+
 // Cast is a type cast.
 type Cast struct {
 	To AST
@@ -2981,12 +3262,24 @@ func (da *DefaultArg) goString(indent int, field string) string {
 
 // Closure is a closure, or lambda expression.
 type Closure struct {
-	Types []AST
-	Num   int
+	TemplateArgs []AST
+	Types        []AST
+	Num          int
 }
 
 func (cl *Closure) print(ps *printState) {
-	ps.writeString("{lambda(")
+	ps.writeString("{lambda")
+	if len(cl.TemplateArgs) > 0 {
+		ps.writeString("<")
+		for i, a := range cl.TemplateArgs {
+			if i > 0 {
+				ps.writeString(", ")
+			}
+			ps.print(a)
+		}
+		ps.writeString(">")
+	}
+	ps.writeString("(")
 	for i, t := range cl.Types {
 		if i > 0 {
 			ps.writeString(", ")
@@ -2998,6 +3291,9 @@ func (cl *Closure) print(ps *printState) {
 
 func (cl *Closure) Traverse(fn func(AST) bool) {
 	if fn(cl) {
+		for _, a := range cl.TemplateArgs {
+			a.Traverse(fn)
+		}
 		for _, t := range cl.Types {
 			t.Traverse(fn)
 		}
@@ -3008,8 +3304,20 @@ func (cl *Closure) Copy(fn func(AST) AST, skip func(AST) bool) AST {
 	if skip(cl) {
 		return nil
 	}
-	types := make([]AST, len(cl.Types))
 	changed := false
+
+	args := make([]AST, len(cl.TemplateArgs))
+	for i, a := range cl.TemplateArgs {
+		ac := a.Copy(fn, skip)
+		if ac == nil {
+			args[i] = a
+		} else {
+			args[i] = ac
+			changed = true
+		}
+	}
+
+	types := make([]AST, len(cl.Types))
 	for i, t := range cl.Types {
 		tc := t.Copy(fn, skip)
 		if tc == nil {
@@ -3019,10 +3327,11 @@ func (cl *Closure) Copy(fn func(AST) AST, skip func(AST) bool) AST {
 			changed = true
 		}
 	}
+
 	if !changed {
 		return fn(cl)
 	}
-	cl = &Closure{Types: types, Num: cl.Num}
+	cl = &Closure{TemplateArgs: args, Types: types, Num: cl.Num}
 	if r := fn(cl); r != nil {
 		return r
 	}
@@ -3034,6 +3343,16 @@ func (cl *Closure) GoString() string {
 }
 
 func (cl *Closure) goString(indent int, field string) string {
+	var args string
+	if len(cl.TemplateArgs) == 0 {
+		args = fmt.Sprintf("%*sTemplateArgs: nil", indent+2, "")
+	} else {
+		args = fmt.Sprintf("%*sTemplateArgs:", indent+2, "")
+		for i, a := range cl.TemplateArgs {
+			args += "\n"
+			args += a.goString(indent+4, fmt.Sprintf("%d: ", i))
+		}
+	}
 	var types string
 	if len(cl.Types) == 0 {
 		types = fmt.Sprintf("%*sTypes: nil", indent+2, "")
@@ -3044,7 +3363,8 @@ func (cl *Closure) goString(indent int, field string) string {
 			types += t.goString(indent+4, fmt.Sprintf("%d: ", i))
 		}
 	}
-	return fmt.Sprintf("%*s%sClosure: Num: %d\n%s", indent, "", field, cl.Num, types)
+	return fmt.Sprintf("%*s%sClosure: Num: %d\n%s\n%s", indent, "", field,
+		cl.Num, args, types)
 }
 
 // UnnamedType is an unnamed type, that just has an index.
