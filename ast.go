@@ -3090,6 +3090,49 @@ func (l *Literal) goString(indent int, field string) string {
 		indent+2, "", l.Val)
 }
 
+// LambdaExpr is a literal that is a lambda expression.
+type LambdaExpr struct {
+	Type AST
+}
+
+func (le *LambdaExpr) print(ps *printState) {
+	ps.writeString("[]")
+	if cl, ok := le.Type.(*Closure); ok {
+		cl.printTypes(ps)
+	}
+	ps.writeString("{...}")
+}
+
+func (le *LambdaExpr) Traverse(fn func(AST) bool) {
+	if fn(le) {
+		le.Type.Traverse(fn)
+	}
+}
+
+func (le *LambdaExpr) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(le) {
+		return nil
+	}
+	typ := le.Type.Copy(fn, skip)
+	if typ == nil {
+		return fn(le)
+	}
+	le = &LambdaExpr{Type: typ}
+	if r := fn(le); r != nil {
+		return r
+	}
+	return le
+}
+
+func (le *LambdaExpr) GoString() string {
+	return le.goString(0, "")
+}
+
+func (le *LambdaExpr) goString(indent int, field string) string {
+	return fmt.Sprintf("%*s%sLambdaExpr:\n%s", indent, "", field,
+		le.Type.goString(indent+2, ""))
+}
+
 // ExprList is a list of expressions, typically arguments to a
 // function call in an expression.
 type ExprList struct {
@@ -3269,6 +3312,11 @@ type Closure struct {
 
 func (cl *Closure) print(ps *printState) {
 	ps.writeString("{lambda")
+	cl.printTypes(ps)
+	ps.writeString(fmt.Sprintf("#%d}", cl.Num+1))
+}
+
+func (cl *Closure) printTypes(ps *printState) {
 	if len(cl.TemplateArgs) > 0 {
 		ps.writeString("<")
 		for i, a := range cl.TemplateArgs {
@@ -3286,7 +3334,7 @@ func (cl *Closure) print(ps *printState) {
 		}
 		ps.print(t)
 	}
-	ps.writeString(fmt.Sprintf(")#%d}", cl.Num+1))
+	ps.writeString(")")
 }
 
 func (cl *Closure) Traverse(fn func(AST) bool) {

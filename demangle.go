@@ -185,7 +185,10 @@ type state struct {
 	off       int           // offset of str within original string
 	subs      substitutions // substitutions
 	templates []*Template   // templates being processed
-	inLambda  int           // number of lambdas being parsed
+
+	// The number of entries in templates when we started parsing
+	// a lambda, plus 1 so that 0 means not parsing a lambda.
+	lambdaTemplateLevel int
 
 	// Counts of template parameters without template arguments,
 	// for lambdas.
@@ -333,11 +336,11 @@ func (st *state) encoding(params bool, local forLocalNameType) AST {
 			template, _ = n.(*Template)
 		}
 	}
-	var oldInLambda int
+	var oldLambdaTemplateLevel int
 	if template != nil {
 		st.templates = append(st.templates, template)
-		oldInLambda = st.inLambda
-		st.inLambda = 0
+		oldLambdaTemplateLevel = st.lambdaTemplateLevel
+		st.lambdaTemplateLevel = 0
 	}
 
 	// Checking for the enable_if attribute here is what the LLVM
@@ -354,7 +357,7 @@ func (st *state) encoding(params bool, local forLocalNameType) AST {
 
 	if template != nil {
 		st.templates = st.templates[:len(st.templates)-1]
-		st.inLambda = oldInLambda
+		st.lambdaTemplateLevel = oldLambdaTemplateLevel
 	}
 
 	ft = simplify(ft)
@@ -1824,14 +1827,12 @@ func (st *state) templateParam() AST {
 
 	n := st.compactNumber()
 
-	if st.inLambda > 0 {
-		// g++ mangles lambda auto params as template params.
-		// Apparently we can't encounter a template within a lambda.
-		// See https://gcc.gnu.org/PR78252.
-		return &LambdaAuto{Index: n}
-	}
-
 	if level >= len(st.templates) {
+		if st.lambdaTemplateLevel > 0 && level == st.lambdaTemplateLevel-1 {
+			// Lambda auto params are mangled as template params.
+			// See https://gcc.gnu.org/PR78252.
+			return &LambdaAuto{Index: n}
+		}
 		st.failEarlier(fmt.Sprintf("template parameter is not in scope of template (level %d >= %d)", level, len(st.templates)), st.off-off)
 	}
 
@@ -1845,6 +1846,11 @@ func (st *state) templateParam() AST {
 	}
 
 	if n >= len(template.Args) {
+		if st.lambdaTemplateLevel > 0 && level == st.lambdaTemplateLevel-1 {
+			// Lambda auto params are mangled as template params.
+			// See https://gcc.gnu.org/PR78252.
+			return &LambdaAuto{Index: n}
+		}
 		st.failEarlier(fmt.Sprintf("template index out of range (%d >= %d)", n, len(template.Args)), st.off-off)
 	}
 
@@ -2404,6 +2410,10 @@ func (st *state) exprPrimary() AST {
 				// We accept one if present because GCC
 				// used to generate one.
 				// https://gcc.gnu.org/PR91979.
+			} else if cl, ok := t.(*Closure); ok {
+				// A closure doesn't have a value.
+				st.advance(1)
+				return &LambdaExpr{Type: cl}
 			} else {
 				st.fail("missing literal value")
 			}
@@ -2457,7 +2467,8 @@ func (st *state) closureTypeName() AST {
 	st.checkChar('U')
 	st.checkChar('l')
 
-	oldInLambda := st.inLambda
+	oldLambdaTemplateLevel := st.lambdaTemplateLevel
+	st.lambdaTemplateLevel = len(st.templates) + 1
 
 	var templateArgs []AST
 	var template *Template
@@ -2472,18 +2483,13 @@ func (st *state) closureTypeName() AST {
 				Name: &Name{Name: "lambda"},
 			}
 			st.templates = append(st.templates, template)
-			st.inLambda = 0
 		}
 		template.Args = append(template.Args, templateVal)
 	}
 
-	if template == nil {
-		st.inLambda++
-	}
-
 	types := st.parmlist()
 
-	st.inLambda = oldInLambda
+	st.lambdaTemplateLevel = oldLambdaTemplateLevel
 
 	if template != nil {
 		st.templates = st.templates[:len(st.templates)-1]
@@ -2538,20 +2544,20 @@ func (st *state) templateParamDecl() (AST, AST) {
 	case 't':
 		st.advance(2)
 		name := mk("$TT", &st.templateTemplateParamCount)
-		oldInLambda := st.inLambda
 		var params []AST
 		var template *Template
 		for {
 			if len(st.str) == 0 {
-				break
+				st.fail("expected closure template parameter")
 			}
 			if st.str[0] == 'E' {
 				st.advance(1)
 				break
 			}
+			off := st.off
 			param, templateVal := st.templateParamDecl()
 			if param == nil {
-				break
+				st.failEarlier("expected closure template parameter", st.off-off)
 			}
 			params = append(params, param)
 			if template == nil {
@@ -2559,14 +2565,12 @@ func (st *state) templateParamDecl() (AST, AST) {
 					Name: &Name{Name: "template_template"},
 				}
 				st.templates = append(st.templates, template)
-				st.inLambda = 0
 			}
 			template.Args = append(template.Args, templateVal)
 		}
 		if template != nil {
 			st.templates = st.templates[:len(st.templates)-1]
 		}
-		st.inLambda = oldInLambda
 		tp := &TemplateTemplateParam{
 			Name:   name,
 			Params: params,
@@ -2737,18 +2741,18 @@ func (st *state) substitution(forPrefix bool) AST {
 		// When copying a Typed we may need to adjust
 		// the templates.
 		copyTemplates := st.templates
-		var oldInLambda []int
+		var oldLambdaTemplateLevel []int
 
 		// pushTemplate is called from skip, popTemplate from copy.
 		pushTemplate := func(template *Template) {
 			copyTemplates = append(copyTemplates, template)
-			oldInLambda = append(oldInLambda, st.inLambda)
-			st.inLambda = 0
+			oldLambdaTemplateLevel = append(oldLambdaTemplateLevel, st.lambdaTemplateLevel)
+			st.lambdaTemplateLevel = 0
 		}
 		popTemplate := func() {
 			copyTemplates = copyTemplates[:len(copyTemplates)-1]
-			st.inLambda = oldInLambda[len(oldInLambda)-1]
-			oldInLambda = oldInLambda[:len(oldInLambda)-1]
+			st.lambdaTemplateLevel = oldLambdaTemplateLevel[len(oldLambdaTemplateLevel)-1]
+			oldLambdaTemplateLevel = oldLambdaTemplateLevel[:len(oldLambdaTemplateLevel)-1]
 		}
 
 		copy := func(a AST) AST {
@@ -2761,8 +2765,9 @@ func (st *state) substitution(forPrefix bool) AST {
 				}
 				return nil
 			case *Closure:
-				// Undo the decrement in skip.
-				st.inLambda--
+				// Undo the save in skip.
+				st.lambdaTemplateLevel = oldLambdaTemplateLevel[len(oldLambdaTemplateLevel)-1]
+				oldLambdaTemplateLevel = oldLambdaTemplateLevel[:len(oldLambdaTemplateLevel)-1]
 				return nil
 			case *TemplateParam:
 				index = a.Index
@@ -2774,7 +2779,7 @@ func (st *state) substitution(forPrefix bool) AST {
 			default:
 				return nil
 			}
-			if st.inLambda > 0 {
+			if st.lambdaTemplateLevel > 0 {
 				if _, ok := a.(*LambdaAuto); ok {
 					return nil
 				}
@@ -2814,8 +2819,9 @@ func (st *state) substitution(forPrefix bool) AST {
 				}
 				return false
 			case *Closure:
-				// This is decremented in copy.
-				st.inLambda++
+				// This is undone in copy.
+				oldLambdaTemplateLevel = append(oldLambdaTemplateLevel, st.lambdaTemplateLevel)
+				st.lambdaTemplateLevel = len(copyTemplates) + 1
 				return false
 			case *TemplateParam, *LambdaAuto:
 				return false
