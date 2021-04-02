@@ -605,7 +605,7 @@ func (st *state) prefix() AST {
 				}
 				st.advance(1)
 				if inheriting {
-					last = st.demangleType(false)
+					st.demangleType(false)
 				}
 				next = &Constructor{Name: getLast(last)}
 			case 'D':

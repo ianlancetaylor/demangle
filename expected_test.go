@@ -43,6 +43,10 @@ var exceptions = map[string]bool{
 	"_Z1KMMMMMMMMMMMMMMMA_xooooooooooooooo":                      true,
 	"_ZdvMMMMMMMMMMMMMrrrrA_DTdvfp_fp_Eededilfdfdfdfd":           true,
 	"_Z1MA_aMMMMA_MMA_MMMMMMMMSt1MS_o11T0000000000t2M0oooozoooo": true,
+
+	// The standard demangler mishandles an inheriting constructor,
+	// getting confused when it picks up the last name.
+	"_ZN1DCI11BEi": true,
 }
 
 // For simplicity, this test reads an exact copy of
