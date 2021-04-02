@@ -815,6 +815,39 @@ func (st *state) number() int {
 	return val
 }
 
+// <seq-id> ::= <0-9A-Z>+
+//
+// We expect this to be followed by an underscore.
+func (st *state) seqID() int {
+	if len(st.str) > 0 && st.str[0] == '_' {
+		st.advance(1)
+		return 0
+	}
+	id := 0
+	for {
+		if len(st.str) == 0 {
+			st.fail("missing end to sequence ID")
+		}
+		// Don't overflow a 32-bit int.
+		if id >= 0x80000000/36-36 {
+			st.fail("sequence ID overflow")
+		}
+		c := st.str[0]
+		if c == '_' {
+			st.advance(1)
+			return id + 1
+		}
+		if isDigit(c) {
+			id = id*36 + int(c-'0')
+		} else if isUpper(c) {
+			id = id*36 + int(c-'A') + 10
+		} else {
+			st.fail("invalid character in sequence ID")
+		}
+		st.advance(1)
+	}
+}
+
 // An operator is the demangled name, and the number of arguments it
 // takes in an expression.
 type operator struct {
@@ -1107,8 +1140,8 @@ func (st *state) specialName() AST {
 			return &Special{Prefix: "guard variable for ", Val: n}
 		case 'R':
 			n := st.name()
-			i := st.number()
-			return &Special{Prefix: fmt.Sprintf("reference temporary #%d for ", i), Val: n}
+			st.seqID()
+			return &Special{Prefix: "reference temporary for ", Val: n}
 		case 'A':
 			v := st.encoding(true, notForLocalName)
 			return &Special{Prefix: "hidden alias for ", Val: v}
@@ -2749,36 +2782,11 @@ func (st *state) substitution(forPrefix bool) AST {
 		st.fail("missing substitution index")
 	}
 	c := st.str[0]
-	st.advance(1)
-	dec := 1
+	off := st.off
 	if c == '_' || isDigit(c) || isUpper(c) {
-		id := 0
-		if c != '_' {
-			for c != '_' {
-				// Don't overflow a 32-bit int.
-				if id >= 0x80000000/36-36 {
-					st.fail("substitution index overflow")
-				}
-				if isDigit(c) {
-					id = id*36 + int(c-'0')
-				} else if isUpper(c) {
-					id = id*36 + int(c-'A') + 10
-				} else {
-					st.fail("invalid character in substitution index")
-				}
-
-				if len(st.str) == 0 {
-					st.fail("missing end to substitution index")
-				}
-				c = st.str[0]
-				st.advance(1)
-				dec++
-			}
-			id++
-		}
-
+		id := st.seqID()
 		if id >= len(st.subs) {
-			st.failEarlier(fmt.Sprintf("substitution index out of range (%d >= %d)", id, len(st.subs)), dec)
+			st.failEarlier(fmt.Sprintf("substitution index out of range (%d >= %d)", id, len(st.subs)), st.off-off)
 		}
 
 		ret := st.subs[id]
@@ -2844,7 +2852,7 @@ func (st *state) substitution(forPrefix bool) AST {
 				// here.
 				template = rt
 			} else {
-				st.failEarlier("substituted template parameter not in scope of template", dec)
+				st.failEarlier("substituted template parameter not in scope of template", st.off-off)
 			}
 			if template == nil {
 				// This template parameter is within
@@ -2853,7 +2861,7 @@ func (st *state) substitution(forPrefix bool) AST {
 			}
 
 			if index >= len(template.Args) {
-				st.failEarlier(fmt.Sprintf("substituted template index out of range (%d >= %d)", index, len(template.Args)), dec)
+				st.failEarlier(fmt.Sprintf("substituted template index out of range (%d >= %d)", index, len(template.Args)), st.off-off)
 			}
 
 			return &TemplateParam{Index: index, Template: template}
@@ -2890,6 +2898,7 @@ func (st *state) substitution(forPrefix bool) AST {
 
 		return ret
 	} else {
+		st.advance(1)
 		m := subAST
 		if st.verbose {
 			m = verboseAST
