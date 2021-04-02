@@ -737,6 +737,10 @@ func (st *state) unqualifiedName() (r AST, isCast bool) {
 			}
 			c := st.str[1]
 			switch c {
+			case 'b':
+				st.advance(2)
+				st.compactNumber()
+				a = &Name{Name: "'block-literal'"}
 			case 'l':
 				a = st.closureTypeName()
 			case 't':
