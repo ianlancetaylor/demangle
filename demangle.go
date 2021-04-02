@@ -1315,6 +1315,23 @@ func (st *state) demangleType(isCast bool) AST {
 	case 'M':
 		ret = st.pointerToMemberType(isCast)
 	case 'T':
+		if len(st.str) > 1 && (st.str[1] == 's' || st.str[1] == 'u' || st.str[1] == 'e') {
+			c = st.str[1]
+			st.advance(2)
+			ret = st.name()
+			var kind string
+			switch c {
+			case 's':
+				kind = "struct"
+			case 'u':
+				kind = "union"
+			case 'e':
+				kind = "enum"
+			}
+			ret = &ElaboratedType{Kind: kind, Type: ret}
+			break
+		}
+
 		ret = st.templateParam()
 		if len(st.str) > 0 && st.str[0] == 'I' {
 			// See the function comment to explain this.

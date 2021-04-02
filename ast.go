@@ -1466,6 +1466,48 @@ func (vt *VectorType) goString(indent int, field string) string {
 		vt.Base.goString(indent+2, "Base: "))
 }
 
+// ElaboratedType is an elaborated struct/union/enum type.
+type ElaboratedType struct {
+	Kind string
+	Type AST
+}
+
+func (et *ElaboratedType) print(ps *printState) {
+	ps.writeString(et.Kind)
+	ps.writeString(" ")
+	et.Type.print(ps)
+}
+
+func (et *ElaboratedType) Traverse(fn func(AST) bool) {
+	if fn(et) {
+		et.Type.Traverse(fn)
+	}
+}
+
+func (et *ElaboratedType) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(et) {
+		return nil
+	}
+	typ := et.Type.Copy(fn, skip)
+	if typ == nil {
+		return fn(et)
+	}
+	et = &ElaboratedType{Kind: et.Kind, Type: typ}
+	if r := fn(et); r != nil {
+		return r
+	}
+	return et
+}
+
+func (et *ElaboratedType) GoString() string {
+	return et.goString(0, "")
+}
+
+func (et *ElaboratedType) goString(indent int, field string) string {
+	return fmt.Sprintf("%*s%sElaboratedtype: Kind: %s\n%s", indent, "", field,
+		et.Kind, et.Type.goString(indent+2, "Expr: "))
+}
+
 // Decltype is the decltype operator.
 type Decltype struct {
 	Expr AST
