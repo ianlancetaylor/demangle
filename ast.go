@@ -3415,6 +3415,69 @@ func (cl *Closure) goString(indent int, field string) string {
 		cl.Num, args, types)
 }
 
+// StructuredBindings is a structured binding declaration.
+type StructuredBindings struct {
+	Bindings []AST
+}
+
+func (sb *StructuredBindings) print(ps *printState) {
+	ps.writeString("[")
+	for i, b := range sb.Bindings {
+		if i > 0 {
+			ps.writeString(", ")
+		}
+		b.print(ps)
+	}
+	ps.writeString("]")
+}
+
+func (sb *StructuredBindings) Traverse(fn func(AST) bool) {
+	if fn(sb) {
+		for _, b := range sb.Bindings {
+			b.Traverse(fn)
+		}
+	}
+}
+
+func (sb *StructuredBindings) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(sb) {
+		return nil
+	}
+	changed := false
+	bindings := make([]AST, len(sb.Bindings))
+	for i, b := range sb.Bindings {
+		bc := b.Copy(fn, skip)
+		if bc == nil {
+			bindings[i] = b
+		} else {
+			bindings[i] = bc
+			changed = true
+		}
+	}
+	if !changed {
+		return fn(sb)
+	}
+	sb = &StructuredBindings{Bindings: bindings}
+	if r := fn(sb); r != nil {
+		return r
+	}
+	return sb
+}
+
+func (sb *StructuredBindings) GoString() string {
+	return sb.goString(0, "")
+}
+
+func (sb *StructuredBindings) goString(indent int, field string) string {
+	var strb strings.Builder
+	fmt.Fprintf(&strb, "%*s%sStructuredBinding:", indent, "", field)
+	for _, b := range sb.Bindings {
+		strb.WriteByte('\n')
+		strb.WriteString(b.goString(indent+2, ""))
+	}
+	return strb.String()
+}
+
 // UnnamedType is an unnamed type, that just has an index.
 type UnnamedType struct {
 	Num int

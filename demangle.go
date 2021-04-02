@@ -582,7 +582,7 @@ func (st *state) prefix() AST {
 		var next AST
 
 		c := st.str[0]
-		if isDigit(c) || isLower(c) || c == 'U' || c == 'L' {
+		if isDigit(c) || isLower(c) || c == 'U' || c == 'L' || (c == 'D' && len(st.str) > 1 && st.str[1] == 'C') {
 			un, isUnCast := st.unqualifiedName()
 			next = un
 			if isUnCast {
@@ -722,6 +722,18 @@ func (st *state) unqualifiedName() (r AST, isCast bool) {
 			n := st.sourceName()
 			a = &Unary{Op: op, Expr: n, Suffix: false, SizeofType: false}
 		}
+	} else if c == 'D' && len(st.str) > 1 && st.str[1] == 'C' {
+		var bindings []AST
+		st.advance(2)
+		for {
+			binding := st.sourceName()
+			bindings = append(bindings, binding)
+			if len(st.str) > 0 && st.str[0] == 'E' {
+				st.advance(1)
+				break
+			}
+		}
+		a = &StructuredBindings{Bindings: bindings}
 	} else {
 		switch c {
 		case 'C', 'D':
