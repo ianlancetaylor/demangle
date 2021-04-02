@@ -2014,6 +2014,7 @@ func (st *state) exprList(stop byte) AST {
 //              ::= fR <binary operator-name> <expression> <expression>
 //              ::= tw <expression>
 //              ::= tr
+//              ::= u <source-name> <template-arg>* E
 //              ::= <unresolved-name>
 //              ::= <expr-primary>
 //
@@ -2131,6 +2132,50 @@ func (st *state) expression() AST {
 		o, _ := st.operatorName(true)
 		t := st.demangleType(false)
 		return &Unary{Op: o, Expr: t, Suffix: false, SizeofType: true}
+	} else if st.str[0] == 'u' {
+		st.advance(1)
+		name := st.sourceName()
+		// Special case __uuidof followed by type or
+		// expression, as used by LLVM.
+		if n, ok := name.(*Name); ok && n.Name == "__uuidof" {
+			if len(st.str) < 2 {
+				st.fail("missing uuidof argument")
+			}
+			var operand AST
+			if st.str[0] == 't' {
+				st.advance(1)
+				operand = st.demangleType(false)
+			} else if st.str[0] == 'z' {
+				st.advance(1)
+				operand = st.expression()
+			}
+			if operand != nil {
+				return &Binary{
+					Op:    &Operator{Name: "()"},
+					Left:  name,
+					Right: &ExprList{
+						Exprs: []AST{operand},
+					},
+				}
+			}
+		}
+		var args []AST
+		for {
+			if len(st.str) == 0 {
+				st.fail("missing argument in vendor extended expressoin")
+			}
+			if st.str[0] == 'E' {
+				st.advance(1)
+				break
+			}
+			arg := st.templateArg()
+			args = append(args, arg)
+		}
+		return &Binary{
+			Op:    &Operator{Name: "()"},
+			Left:  name,
+			Right: &ExprList{Exprs: args},
+		}
 	} else {
 		if len(st.str) < 2 {
 			st.fail("missing operator code")
