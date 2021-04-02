@@ -922,6 +922,7 @@ var operators = map[string]operator{
 	"ng": {"-", 1},
 	"nt": {"!", 1},
 	"nw": {"new", 3},
+	"nx": {"noexcept", 1},
 	"oR": {"|=", 2},
 	"oo": {"||", 2},
 	"or": {"|", 2},
