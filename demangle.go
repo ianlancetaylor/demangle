@@ -2493,6 +2493,14 @@ func (st *state) exprPrimary() AST {
 	} else {
 		t := st.demangleType(false)
 
+		isArrayType := func(typ AST) bool {
+			if twq, ok := typ.(*TypeWithQualifiers); ok {
+				typ = twq.Base
+			}
+			_, ok := typ.(*ArrayType)
+			return ok
+		}
+
 		neg := false
 		if len(st.str) > 0 && st.str[0] == 'n' {
 			neg = true
@@ -2508,6 +2516,9 @@ func (st *state) exprPrimary() AST {
 				// A closure doesn't have a value.
 				st.advance(1)
 				return &LambdaExpr{Type: cl}
+			} else if isArrayType(t) {
+				st.advance(1)
+				return &StringLiteral{Type: t}
 			} else {
 				st.fail("missing literal value")
 			}

@@ -3090,6 +3090,47 @@ func (l *Literal) goString(indent int, field string) string {
 		indent+2, "", l.Val)
 }
 
+// StringLiteral is a string literal.
+type StringLiteral struct {
+	Type AST
+}
+
+func (sl *StringLiteral) print(ps *printState) {
+	ps.writeString(`"<`)
+	sl.Type.print(ps)
+	ps.writeString(`>"`)
+}
+
+func (sl *StringLiteral) Traverse(fn func(AST) bool) {
+	if fn(sl) {
+		sl.Type.Traverse(fn)
+	}
+}
+
+func (sl *StringLiteral) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(sl) {
+		return nil
+	}
+	typ := sl.Type.Copy(fn, skip)
+	if typ == nil {
+		return fn(sl)
+	}
+	sl = &StringLiteral{Type: typ}
+	if r := fn(sl); r != nil {
+		return r
+	}
+	return sl
+}
+
+func (sl *StringLiteral) GoString() string {
+	return sl.goString(0, "")
+}
+
+func (sl *StringLiteral) goString(indent int, field string) string {
+	return fmt.Sprintf("%*s%sStringLiteral:\n%s", indent, "", field,
+		sl.Type.goString(indent+2, ""))
+}
+
 // LambdaExpr is a literal that is a lambda expression.
 type LambdaExpr struct {
 	Type AST
