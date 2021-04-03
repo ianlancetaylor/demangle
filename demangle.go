@@ -608,6 +608,9 @@ func (st *state) prefix() AST {
 					st.demangleType(false)
 				}
 				next = &Constructor{Name: getLast(last)}
+				if len(st.str) > 0 && st.str[0] == 'B' {
+					next = st.taggedName(next)
+				}
 			case 'D':
 				if len(st.str) > 1 && (st.str[1] == 'T' || st.str[1] == 't') {
 					next = st.demangleType(false)
@@ -620,6 +623,9 @@ func (st *state) prefix() AST {
 					}
 					st.advance(2)
 					next = &Destructor{Name: getLast(last)}
+					if len(st.str) > 0 && st.str[0] == 'B' {
+						next = st.taggedName(next)
+					}
 				}
 			case 'S':
 				next = st.substitution(true)
