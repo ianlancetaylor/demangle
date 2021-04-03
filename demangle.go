@@ -71,6 +71,30 @@ func ToAST(name string, options ...Option) (AST, error) {
 		return a, adjustErr(err, 2)
 	}
 
+	if strings.HasPrefix(name, "___Z") {
+		// clang extensions
+		block := strings.LastIndex(name, "_block_invoke")
+		if block == -1 {
+			return nil, ErrNotMangledName
+		}
+		a, err := doDemangle(name[4:block], options...)
+		if err != nil {
+			return a, adjustErr(err, 4)
+		}
+		name = strings.TrimPrefix(name[block:], "_block_invoke")
+		if len(name) > 0 && name[0] == '_' {
+			name = name[1:]
+		}
+		for len(name) > 0 && isDigit(name[0]) {
+			name = name[1:]
+		}
+		if len(name) > 0 && name[0] != '.' {
+			return nil, errors.New("unparsed characters at end of mangled name")
+		}
+		a = &Special{Prefix: "invocation function for block in ", Val: a}
+		return a, nil
+	}
+
 	const prefix = "_GLOBAL_"
 	if strings.HasPrefix(name, prefix) {
 		// The standard demangler ignores NoParams for global
