@@ -2593,6 +2593,15 @@ func (st *state) exprPrimary() AST {
 //                     __ <(non-negative) number> _ (when number >= 10)
 func (st *state) discriminator(a AST) AST {
 	if len(st.str) == 0 || st.str[0] != '_' {
+		// clang can generate a discriminator at the end of
+		// the string with no underscore.
+		for i := 0; i < len(st.str); i++ {
+			if !isDigit(st.str[i]) {
+				return a
+			}
+		}
+		// Skip the trailing digits.
+		st.advance(len(st.str))
 		return a
 	}
 	off := st.off
