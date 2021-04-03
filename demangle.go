@@ -860,7 +860,7 @@ func (st *state) number() int {
 // <seq-id> ::= <0-9A-Z>+
 //
 // We expect this to be followed by an underscore.
-func (st *state) seqID() int {
+func (st *state) seqID(eofOK bool) int {
 	if len(st.str) > 0 && st.str[0] == '_' {
 		st.advance(1)
 		return 0
@@ -868,6 +868,9 @@ func (st *state) seqID() int {
 	id := 0
 	for {
 		if len(st.str) == 0 {
+			if eofOK {
+				return id + 1
+			}
 			st.fail("missing end to sequence ID")
 		}
 		// Don't overflow a 32-bit int.
@@ -1183,7 +1186,7 @@ func (st *state) specialName() AST {
 			return &Special{Prefix: "guard variable for ", Val: n}
 		case 'R':
 			n := st.name()
-			st.seqID()
+			st.seqID(true)
 			return &Special{Prefix: "reference temporary for ", Val: n}
 		case 'A':
 			v := st.encoding(true, notForLocalName)
@@ -2855,7 +2858,7 @@ func (st *state) substitution(forPrefix bool) AST {
 	c := st.str[0]
 	off := st.off
 	if c == '_' || isDigit(c) || isUpper(c) {
-		id := st.seqID()
+		id := st.seqID(false)
 		if id >= len(st.subs) {
 			st.failEarlier(fmt.Sprintf("substitution index out of range (%d >= %d)", id, len(st.subs)), st.off-off)
 		}
