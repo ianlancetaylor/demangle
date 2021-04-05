@@ -341,25 +341,30 @@ func (st *state) encoding(params bool, local forLocalNameType) AST {
 		return a
 	}
 
-	check := a
-	mwq, _ := check.(*MethodWithQualifiers)
-	if mwq != nil {
-		check = mwq.Method
+	mwq, _ := a.(*MethodWithQualifiers)
+
+	var findTemplate func(AST) *Template
+	findTemplate = func(check AST) *Template {
+		switch check := check.(type) {
+		case *Template:
+			return check
+		case *Qualified:
+			if check.LocalName {
+				return findTemplate(check.Name)
+			} else if _, ok := check.Name.(*Constructor); ok {
+				return findTemplate(check.Name)
+			}
+		case *MethodWithQualifiers:
+			return findTemplate(check.Method)
+		case *Constructor:
+			if check.Base != nil {
+				return findTemplate(check.Base)
+			}
+		}
+		return nil
 	}
 
-	var template *Template
-	switch check := check.(type) {
-	case *Template:
-		template = check
-	case *Qualified:
-		if check.LocalName {
-			n := check.Name
-			if nmwq, ok := n.(*MethodWithQualifiers); ok {
-				n = nmwq.Method
-			}
-			template, _ = n.(*Template)
-		}
-	}
+	template := findTemplate(a)
 	var oldLambdaTemplateLevel int
 	if template != nil {
 		st.templates = append(st.templates, template)
@@ -628,10 +633,14 @@ func (st *state) prefix() AST {
 					st.fail("constructor before name is seen")
 				}
 				st.advance(1)
+				var base AST
 				if inheriting {
-					st.demangleType(false)
+					base = st.demangleType(false)
 				}
-				next = &Constructor{Name: getLast(last)}
+				next = &Constructor{
+					Name: getLast(last),
+					Base: base,
+				}
 				if len(st.str) > 0 && st.str[0] == 'B' {
 					next = st.taggedName(next)
 				}

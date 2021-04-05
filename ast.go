@@ -1586,15 +1586,20 @@ func (op *Operator) goString(indent int, field string) string {
 // Constructor is a constructor.
 type Constructor struct {
 	Name AST
+	Base AST // base class of inheriting constructor
 }
 
 func (c *Constructor) print(ps *printState) {
 	ps.print(c.Name)
+	// We don't include the base class in the demangled string.
 }
 
 func (c *Constructor) Traverse(fn func(AST) bool) {
 	if fn(c) {
 		c.Name.Traverse(fn)
+		if c.Base != nil {
+			c.Base.Traverse(fn)
+		}
 	}
 }
 
@@ -1603,10 +1608,20 @@ func (c *Constructor) Copy(fn func(AST) AST, skip func(AST) bool) AST {
 		return nil
 	}
 	name := c.Name.Copy(fn, skip)
-	if name == nil {
+	var base AST
+	if c.Base != nil {
+		base = c.Base.Copy(fn, skip)
+	}
+	if name == nil && base == nil {
 		return fn(c)
 	}
-	c = &Constructor{Name: name}
+	if name == nil {
+		name = c.Name
+	}
+	if base == nil {
+		base = c.Base
+	}
+	c = &Constructor{Name: name, Base: base}
 	if r := fn(c); r != nil {
 		return r
 	}
@@ -1618,7 +1633,13 @@ func (c *Constructor) GoString() string {
 }
 
 func (c *Constructor) goString(indent int, field string) string {
-	return fmt.Sprintf("%*s%sConstructor:\n%s", indent, "", field, c.Name.goString(indent+2, "Name: "))
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "%*s%sConstructor:\n", indent, "", field)
+	if c.Base != nil {
+		fmt.Fprintf(&sb, "%s\n", c.Base.goString(indent+2, "Base: "))
+	}
+	fmt.Fprintf(&sb, "%s", c.Name.goString(indent+2, "Name: "))
+	return sb.String()
 }
 
 // Destructor is a destructor.
