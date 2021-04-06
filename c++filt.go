@@ -41,6 +41,7 @@ var noParams = flag.Bool("p", false, "Do not display function argument types")
 var noVerbose = flag.Bool("i", false, "Do not show implementation details (if any)")
 var help = flag.Bool("h", false, "Display help information")
 var debug = flag.Bool("d", false, "Display debugging information for strings on command line")
+var llvm = flag.Bool("llvm", false, "Demangle strings in LLVM style")
 
 // Unimplemented c++filt flags:
 // -n (opposite of -_)
@@ -140,6 +141,9 @@ func options() []demangle.Option {
 	}
 	if !*noVerbose {
 		options = append(options, demangle.Verbose)
+	}
+	if *llvm {
+		options = append(options, demangle.LLVMStyle)
 	}
 	return options
 }

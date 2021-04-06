@@ -35,6 +35,12 @@ const (
 
 	// The Verbose option turns on more verbose demangling.
 	Verbose
+
+	// LLVMStyle tries to translate an AST to a string in the
+	// style of the LLVM demangler. This does not affect
+	// the parsing of the AST, only the conversion of the AST
+	// to a string.
+	LLVMStyle
 )
 
 // Filter demangles a C++ symbol name, returning the human-readable C++ name.
@@ -174,12 +180,13 @@ func doDemangle(name string, options ...Option) (ret AST, err error) {
 		case NoParams:
 			params = false
 			clones = false
-		case NoTemplateParams:
-		// This is a valid option but only affect printing of the AST.
 		case NoClones:
 			clones = false
 		case Verbose:
 			verbose = true
+		case NoTemplateParams, LLVMStyle:
+			// These are valid options but only affect
+			// printing of the AST.
 		default:
 			return nil, fmt.Errorf("unrecognized demangler option %v", o)
 		}
@@ -395,7 +402,7 @@ func (st *state) encoding(params bool, local forLocalNameType) AST {
 	// doesn't get confused with the top level return type.
 	if local == forLocalName {
 		if functype, ok := ft.(*FunctionType); ok {
-			functype.Return = nil
+			functype.ForLocalName = true
 		}
 	}
 
@@ -1799,7 +1806,11 @@ func (st *state) bareFunctionType(hasReturnType bool) AST {
 		returnType = st.demangleType(false)
 	}
 	types := st.parmlist()
-	return &FunctionType{Return: returnType, Args: types}
+	return &FunctionType{
+		Return:       returnType,
+		Args:         types,
+		ForLocalName: false, // may be set later in encoding
+	}
 }
 
 // <array-type> ::= A <(positive dimension) number> _ <(element) type>
@@ -2260,8 +2271,8 @@ func (st *state) expression() AST {
 			}
 			if operand != nil {
 				return &Binary{
-					Op:    &Operator{Name: "()"},
-					Left:  name,
+					Op:   &Operator{Name: "()"},
+					Left: name,
 					Right: &ExprList{
 						Exprs: []AST{operand},
 					},
@@ -2695,7 +2706,7 @@ func (st *state) templateParamDecl() (AST, AST) {
 		(*p)++
 		return &TemplateParamName{
 			Prefix: prefix,
-			Index: idx,
+			Index:  idx,
 		}
 	}
 	switch st.str[1] {

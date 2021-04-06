@@ -37,21 +37,25 @@ type AST interface {
 // ASTToString returns the demangled name of the AST.
 func ASTToString(a AST, options ...Option) string {
 	tparams := true
+	llvmStyle := false
 	for _, o := range options {
 		switch o {
 		case NoTemplateParams:
 			tparams = false
+		case LLVMStyle:
+			llvmStyle = true
 		}
 	}
 
-	ps := printState{tparams: tparams}
+	ps := printState{tparams: tparams, llvmStyle: llvmStyle}
 	a.print(&ps)
 	return ps.buf.String()
 }
 
 // The printState type holds information needed to print an AST.
 type printState struct {
-	tparams bool // whether to print template parameters
+	tparams   bool // whether to print template parameters
+	llvmStyle bool
 
 	buf  strings.Builder
 	last byte // Last byte written to buffer.
@@ -408,7 +412,11 @@ type LambdaAuto struct {
 func (la *LambdaAuto) print(ps *printState) {
 	// We print the index plus 1 because that is what the standard
 	// demangler does.
-	fmt.Fprintf(&ps.buf, "auto:%d", la.Index+1)
+	if ps.llvmStyle {
+		ps.writeString("auto")
+	} else {
+		fmt.Fprintf(&ps.buf, "auto:%d", la.Index+1)
+	}
 }
 
 func (la *LambdaAuto) Traverse(fn func(AST) bool) {
@@ -504,6 +512,9 @@ func (q *Qualifier) print(ps *printState) {
 		ps.writeByte('(')
 		first := true
 		for _, e := range q.Exprs {
+			if el, ok := e.(*ExprList); ok && len(el.Exprs) == 0 {
+				continue
+			}
 			if !first {
 				ps.writeString(", ")
 			}
@@ -715,7 +726,11 @@ type BuiltinType struct {
 }
 
 func (bt *BuiltinType) print(ps *printState) {
-	ps.writeString(bt.Name)
+	name := bt.Name
+	if ps.llvmStyle && name == "decltype(nullptr)" {
+		name = "std::nullptr_t"
+	}
+	ps.writeString(name)
 }
 
 func (bt *BuiltinType) Traverse(fn func(AST) bool) {
@@ -970,10 +985,15 @@ type VendorQualifier struct {
 }
 
 func (vq *VendorQualifier) print(ps *printState) {
-	ps.inner = append(ps.inner, vq)
-	ps.print(vq.Type)
-	if len(ps.inner) > 0 {
-		ps.printOneInner(nil)
+	if ps.llvmStyle {
+		ps.print(vq.Type)
+		vq.printInner(ps)
+	} else {
+		ps.inner = append(ps.inner, vq)
+		ps.print(vq.Type)
+		if len(ps.inner) > 0 {
+			ps.printOneInner(nil)
+		}
 	}
 }
 
@@ -1110,19 +1130,27 @@ func (at *ArrayType) goString(indent int, field string) string {
 		at.Element.goString(indent+2, "Element: "))
 }
 
-// FunctionType is a function type.  The Return field may be nil for
-// cases where the return type is not part of the mangled name.
+// FunctionType is a function type.
 type FunctionType struct {
 	Return AST
 	Args   []AST
+
+	// The forLocalName field reports whether this FunctionType
+	// was created for a local name. With the default GNU demangling
+	// output we don't print the return type in that case.
+	ForLocalName bool
 }
 
 func (ft *FunctionType) print(ps *printState) {
-	if ft.Return != nil {
+	retType := ft.Return
+	if ft.ForLocalName && !ps.llvmStyle {
+		retType = nil
+	}
+	if retType != nil {
 		// Pass the return type as an inner type in order to
 		// print the arguments in the right location.
 		ps.inner = append(ps.inner, ft)
-		ps.print(ft.Return)
+		ps.print(retType)
 		if len(ps.inner) == 0 {
 			// Everything was printed.
 			return
@@ -1227,7 +1255,11 @@ func (ft *FunctionType) Copy(fn func(AST) AST, skip func(AST) bool) AST {
 	if !changed {
 		return fn(ft)
 	}
-	ft = &FunctionType{Return: ret, Args: args}
+	ft = &FunctionType{
+		Return:       ret,
+		Args:         args,
+		ForLocalName: ft.ForLocalName,
+	}
 	if r := fn(ft); r != nil {
 		return r
 	}
@@ -1239,6 +1271,10 @@ func (ft *FunctionType) GoString() string {
 }
 
 func (ft *FunctionType) goString(indent int, field string) string {
+	var forLocalName string
+	if ft.ForLocalName {
+		forLocalName = " ForLocalName: true"
+	}
 	var r string
 	if ft.Return == nil {
 		r = fmt.Sprintf("%*sReturn: nil", indent+2, "")
@@ -1255,7 +1291,8 @@ func (ft *FunctionType) goString(indent int, field string) string {
 			args += a.goString(indent+4, fmt.Sprintf("%d: ", i))
 		}
 	}
-	return fmt.Sprintf("%*s%sFunctionType:\n%s\n%s", indent, "", field, r, args)
+	return fmt.Sprintf("%*s%sFunctionType:%s\n%s\n%s", indent, "", field,
+		forLocalName, r, args)
 }
 
 // FunctionParam is a parameter of a function, used for last-specified
@@ -1267,6 +1304,12 @@ type FunctionParam struct {
 func (fp *FunctionParam) print(ps *printState) {
 	if fp.Index == 0 {
 		ps.writeString("this")
+	} else if ps.llvmStyle {
+		if fp.Index == 1 {
+			ps.writeString("fp")
+		} else {
+			fmt.Fprintf(&ps.buf, "fp%d", fp.Index-2)
+		}
 	} else {
 		fmt.Fprintf(&ps.buf, "{parm#%d}", fp.Index)
 	}
@@ -1422,9 +1465,15 @@ func (vt *VectorType) print(ps *printState) {
 }
 
 func (vt *VectorType) printInner(ps *printState) {
-	ps.writeString(" __vector(")
+	end := byte(')')
+	if ps.llvmStyle {
+		ps.writeString(" vector[")
+		end = ']'
+	} else {
+		ps.writeString(" __vector(")
+	}
 	ps.print(vt.Dimension)
-	ps.writeByte(')')
+	ps.writeByte(end)
 }
 
 func (vt *VectorType) Traverse(fn func(AST) bool) {
@@ -1514,7 +1563,11 @@ type Decltype struct {
 }
 
 func (dt *Decltype) print(ps *printState) {
-	ps.writeString("decltype (")
+	ps.writeString("decltype")
+	if !ps.llvmStyle {
+		ps.writeString(" ")
+	}
+	ps.writeString("(")
 	ps.print(dt.Expr)
 	ps.writeByte(')')
 }
@@ -1790,8 +1843,12 @@ func (pe *PackExpansion) print(ps *printState) {
 	// We normally only get here if the simplify function was
 	// unable to locate and expand the pack.
 	if pe.Pack == nil {
-		parenthesize(ps, pe.Base)
-		ps.writeString("...")
+		if ps.llvmStyle {
+			ps.print(pe.Base)
+		} else {
+			parenthesize(ps, pe.Base)
+			ps.writeString("...")
+		}
 	} else {
 		ps.print(pe.Base)
 	}
@@ -1897,7 +1954,13 @@ type SizeofPack struct {
 }
 
 func (sp *SizeofPack) print(ps *printState) {
-	ps.writeString(fmt.Sprintf("%d", len(sp.Pack.Args)))
+	if ps.llvmStyle {
+		ps.writeString("sizeof...(")
+		ps.print(sp.Pack)
+		ps.writeByte(')')
+	} else {
+		ps.writeString(fmt.Sprintf("%d", len(sp.Pack.Args)))
+	}
 }
 
 func (sp *SizeofPack) Traverse(fn func(AST) bool) {
@@ -2006,7 +2069,7 @@ type TemplateParamName struct {
 func (tpn *TemplateParamName) print(ps *printState) {
 	ps.writeString(tpn.Prefix)
 	if tpn.Index > 0 {
-		ps.writeString(fmt.Sprintf("%d", tpn.Index - 1))
+		ps.writeString(fmt.Sprintf("%d", tpn.Index-1))
 	}
 }
 
@@ -2028,7 +2091,7 @@ func (tpn *TemplateParamName) GoString() string {
 func (tpn *TemplateParamName) goString(indent int, field string) string {
 	name := tpn.Prefix
 	if tpn.Index > 0 {
-		name += fmt.Sprintf("%d", tpn.Index - 1)
+		name += fmt.Sprintf("%d", tpn.Index-1)
 	}
 	return fmt.Sprintf("%*s%sTemplateParamName: %s", indent, "", field, name)
 }
@@ -2321,7 +2384,11 @@ func (c *Cast) goString(indent int, field string) string {
 func parenthesize(ps *printState, val AST) {
 	paren := false
 	switch v := val.(type) {
-	case *Name, *InitializerList, *FunctionParam:
+	case *Name, *InitializerList:
+	case *FunctionParam:
+		if ps.llvmStyle {
+			paren = true
+		}
 	case *Qualified:
 		if v.LocalName {
 			paren = true
@@ -2391,14 +2458,17 @@ type Unary struct {
 }
 
 func (u *Unary) print(ps *printState) {
+	op, _ := u.Op.(*Operator)
 	expr := u.Expr
 
 	// Don't print the argument list when taking the address of a
 	// function.
-	if op, ok := u.Op.(*Operator); ok && op.Name == "&" {
-		if t, ok := expr.(*Typed); ok {
-			if _, ok := t.Type.(*FunctionType); ok {
-				expr = t.Name
+	if !ps.llvmStyle {
+		if op != nil && op.Name == "&" {
+			if t, ok := expr.(*Typed); ok {
+				if _, ok := t.Type.(*FunctionType); ok {
+					expr = t.Name
+				}
 			}
 		}
 	}
@@ -2407,8 +2477,11 @@ func (u *Unary) print(ps *printState) {
 		parenthesize(ps, expr)
 	}
 
-	if op, ok := u.Op.(*Operator); ok {
+	if op != nil {
 		ps.writeString(op.Name)
+		if ps.llvmStyle && op.Name == "noexcept" {
+			ps.writeByte(' ')
+		}
 	} else if c, ok := u.Op.(*Cast); ok {
 		ps.writeByte('(')
 		ps.print(c.To)
@@ -2418,7 +2491,7 @@ func (u *Unary) print(ps *printState) {
 	}
 
 	if !u.Suffix {
-		if op, ok := u.Op.(*Operator); ok && op.Name == "::" {
+		if op != nil && op.Name == "::" {
 			// Don't use parentheses after ::.
 			ps.print(expr)
 		} else if u.SizeofType {
@@ -2426,11 +2499,19 @@ func (u *Unary) print(ps *printState) {
 			ps.writeByte('(')
 			ps.print(expr)
 			ps.writeByte(')')
-		} else if op, ok := u.Op.(*Operator); ok && op.Name == "__alignof__" {
+		} else if op != nil && op.Name == "__alignof__" {
 			// Always use parentheses for __alignof__ argument.
 			ps.writeByte('(')
 			ps.print(expr)
 			ps.writeByte(')')
+		} else if ps.llvmStyle {
+			if op == nil || op.Name != `operator"" ` {
+				ps.writeByte('(')
+			}
+			ps.print(expr)
+			if op == nil || op.Name != `operator"" ` {
+				ps.writeByte(')')
+			}
 		} else {
 			parenthesize(ps, expr)
 		}
@@ -2489,7 +2570,16 @@ func isDesignatedInitializer(x AST) bool {
 	switch x := x.(type) {
 	case *Binary:
 		if op, ok := x.Op.(*Operator); ok {
-			return op.Name == "=" || op.Name == "]="
+			if op.Name == "]=" {
+				return true
+			}
+			if op.Name != "=" {
+				return false
+			}
+			if _, ok := x.Left.(*Literal); ok {
+				return false
+			}
+			return true
 		}
 	case *Trinary:
 		if op, ok := x.Op.(*Operator); ok {
@@ -2534,8 +2624,13 @@ func (b *Binary) print(ps *printState) {
 			// initializer chains.
 			ps.print(b.Right)
 		} else {
-			ps.writeByte('=')
-			parenthesize(ps, b.Right)
+			if ps.llvmStyle {
+				ps.writeString(" = ")
+				ps.print(b.Right)
+			} else {
+				ps.writeByte('=')
+				parenthesize(ps, b.Right)
+			}
 		}
 		return
 	}
@@ -2549,9 +2644,19 @@ func (b *Binary) print(ps *printState) {
 
 	left := b.Left
 
+	skipParens := false
+	skipBothParens := false
+	addSpaces := ps.llvmStyle
+	if ps.llvmStyle && op != nil {
+		switch op.Name {
+		case ".", "->":
+			skipBothParens = true
+			addSpaces = false
+		}
+	}
+
 	// For a function call in an expression, don't print the types
 	// of the arguments unless there is a return type.
-	skipParens := false
 	if op != nil && op.Name == "()" {
 		if ty, ok := b.Left.(*Typed); ok {
 			if ft, ok := ty.Type.(*FunctionType); ok {
@@ -2564,10 +2669,17 @@ func (b *Binary) print(ps *printState) {
 				left = ty.Name
 			}
 		}
+		if ps.llvmStyle {
+			skipParens = true
+		}
 	}
 
-	if skipParens {
+	if skipParens || skipBothParens {
 		ps.print(left)
+	} else if ps.llvmStyle {
+		ps.writeByte('(')
+		ps.print(left)
+		ps.writeByte(')')
 	} else {
 		parenthesize(ps, left)
 	}
@@ -2581,13 +2693,27 @@ func (b *Binary) print(ps *printState) {
 
 	if op != nil {
 		if op.Name != "()" {
+			if addSpaces {
+				ps.writeByte(' ')
+			}
 			ps.writeString(op.Name)
+			if addSpaces {
+				ps.writeByte(' ')
+			}
 		}
 	} else {
 		ps.print(b.Op)
 	}
 
-	parenthesize(ps, b.Right)
+	if skipBothParens {
+		ps.print(b.Right)
+	} else if ps.llvmStyle {
+		ps.writeByte('(')
+		ps.print(b.Right)
+		ps.writeByte(')')
+	} else {
+		parenthesize(ps, b.Right)
+	}
 
 	if op != nil && op.Name == ">" {
 		ps.writeByte(')')
@@ -2659,14 +2785,23 @@ func (t *Trinary) print(ps *printState) {
 			// initializer chains.
 			ps.print(t.Third)
 		} else {
-			ps.writeByte('=')
-			parenthesize(ps, t.Third)
+			if ps.llvmStyle {
+				ps.writeString(" = ")
+				ps.print(t.Third)
+			} else {
+				ps.writeByte('=')
+				parenthesize(ps, t.Third)
+			}
 		}
 		return
 	}
 
 	parenthesize(ps, t.First)
-	ps.writeByte('?')
+	if ps.llvmStyle {
+		ps.writeString(" ? ")
+	} else {
+		ps.writeByte('?')
+	}
 	parenthesize(ps, t.Second)
 	ps.writeString(" : ")
 	parenthesize(ps, t.Third)
@@ -2735,9 +2870,22 @@ func (f *Fold) print(ps *printState) {
 	op, _ := f.Op.(*Operator)
 	printOp := func() {
 		if op != nil {
+			if ps.llvmStyle {
+				ps.writeByte(' ')
+			}
 			ps.writeString(op.Name)
+			if ps.llvmStyle {
+				ps.writeByte(' ')
+			}
 		} else {
 			ps.print(f.Op)
+		}
+	}
+	foldParenthesize := func(a AST) {
+		if _, ok := a.(*ArgumentPack); ok || !ps.llvmStyle {
+			parenthesize(ps, a)
+		} else {
+			ps.print(a)
 		}
 	}
 
@@ -2745,21 +2893,21 @@ func (f *Fold) print(ps *printState) {
 		if f.Left {
 			ps.writeString("(...")
 			printOp()
-			parenthesize(ps, f.Arg1)
+			foldParenthesize(f.Arg1)
 			ps.writeString(")")
 		} else {
 			ps.writeString("(")
-			parenthesize(ps, f.Arg1)
+			foldParenthesize(f.Arg1)
 			printOp()
 			ps.writeString("...)")
 		}
 	} else {
 		ps.writeString("(")
-		parenthesize(ps, f.Arg1)
+		foldParenthesize(f.Arg1)
 		printOp()
 		ps.writeString("...")
 		printOp()
-		parenthesize(ps, f.Arg2)
+		foldParenthesize(f.Arg2)
 		ps.writeString(")")
 	}
 }
@@ -3095,7 +3243,11 @@ func (l *Literal) print(ps *printState) {
 				return
 			}
 		} else if b.Name == "decltype(nullptr)" && l.Val == "" {
-			ps.print(l.Type)
+			if ps.llvmStyle {
+				ps.writeString("nullptr")
+			} else {
+				ps.print(l.Type)
+			}
 			return
 		} else {
 			isFloat = builtinTypeFloat[b.Name]
@@ -3373,7 +3525,9 @@ type DefaultArg struct {
 }
 
 func (da *DefaultArg) print(ps *printState) {
-	fmt.Fprintf(&ps.buf, "{default arg#%d}::", da.Num+1)
+	if !ps.llvmStyle {
+		fmt.Fprintf(&ps.buf, "{default arg#%d}::", da.Num+1)
+	}
 	ps.print(da.Arg)
 }
 
@@ -3415,9 +3569,19 @@ type Closure struct {
 }
 
 func (cl *Closure) print(ps *printState) {
-	ps.writeString("{lambda")
+	if ps.llvmStyle {
+		if cl.Num == 0 {
+			ps.writeString("'lambda'")
+		} else {
+			ps.writeString(fmt.Sprintf("'lambda%d'", cl.Num-1))
+		}
+	} else {
+		ps.writeString("{lambda")
+	}
 	cl.printTypes(ps)
-	ps.writeString(fmt.Sprintf("#%d}", cl.Num+1))
+	if !ps.llvmStyle {
+		ps.writeString(fmt.Sprintf("#%d}", cl.Num+1))
+	}
 }
 
 func (cl *Closure) printTypes(ps *printState) {
@@ -3588,7 +3752,15 @@ type UnnamedType struct {
 }
 
 func (ut *UnnamedType) print(ps *printState) {
-	ps.writeString(fmt.Sprintf("{unnamed type#%d}", ut.Num+1))
+	if ps.llvmStyle {
+		if ut.Num == 0 {
+			ps.writeString("'unnamed'")
+		} else {
+			ps.writeString(fmt.Sprintf("'unnamed%d'", ut.Num-1))
+		}
+	} else {
+		ps.writeString(fmt.Sprintf("{unnamed type#%d}", ut.Num+1))
+	}
 }
 
 func (ut *UnnamedType) Traverse(fn func(AST) bool) {
@@ -3618,7 +3790,13 @@ type Clone struct {
 
 func (c *Clone) print(ps *printState) {
 	ps.print(c.Base)
-	ps.writeString(fmt.Sprintf(" [clone %s]", c.Suffix))
+	if ps.llvmStyle {
+		ps.writeString(" (")
+		ps.writeString(c.Suffix)
+		ps.writeByte(')')
+	} else {
+		ps.writeString(fmt.Sprintf(" [clone %s]", c.Suffix))
+	}
 }
 
 func (c *Clone) Traverse(fn func(AST) bool) {
@@ -3659,7 +3837,16 @@ type Special struct {
 }
 
 func (s *Special) print(ps *printState) {
-	ps.writeString(s.Prefix)
+	prefix := s.Prefix
+	if ps.llvmStyle {
+		switch prefix {
+		case "TLS wrapper function for ":
+			prefix = "thread-local wrapper routine for "
+		case "TLS init function for ":
+			prefix = "thread-local initialization routine for "
+		}
+	}
+	ps.writeString(prefix)
 	ps.print(s.Val)
 }
 
@@ -3871,7 +4058,12 @@ func (ps *printState) printOneInner(save *[]AST) {
 func (ps *printState) isEmpty(a AST) bool {
 	switch a := a.(type) {
 	case *ArgumentPack:
-		return len(a.Args) == 0
+		for _, a := range a.Args {
+			if !ps.isEmpty(a) {
+				return false
+			}
+		}
+		return true
 	case *ExprList:
 		return len(a.Exprs) == 0
 	case *PackExpansion:
