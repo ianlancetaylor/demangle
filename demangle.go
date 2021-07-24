@@ -381,7 +381,7 @@ func (st *state) encoding(params bool, local forLocalNameType) AST {
 
 	// Checking for the enable_if attribute here is what the LLVM
 	// demangler does.  This is not very general but perhaps it is
-	// sufficent.
+	// sufficient.
 	const enableIfPrefix = "Ua9enable_ifI"
 	var enableIfArgs []AST
 	if strings.HasPrefix(st.str, enableIfPrefix) {
