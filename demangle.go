@@ -2,9 +2,12 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package demangle defines functions that demangle GCC/LLVM C++ symbol names.
+// Package demangle defines functions that demangle GCC/LLVM
+// C++ and Rust symbol names.
 // This package recognizes names that were mangled according to the C++ ABI
-// defined at http://codesourcery.com/cxx-abi/.
+// defined at http://codesourcery.com/cxx-abi/ and the Rust ABI
+// defined at
+// https://rust-lang.github.io/rfcs/2603-rust-symbol-name-mangling-v0.html
 //
 // Most programs will want to call Filter or ToString.
 package demangle
@@ -17,7 +20,7 @@ import (
 
 // ErrNotMangledName is returned by CheckedDemangle if the string does
 // not appear to be a C++ symbol name.
-var ErrNotMangledName = errors.New("not a C++ mangled name")
+var ErrNotMangledName = errors.New("not a C++ or Rust mangled name")
 
 // Option is the type of demangler options.
 type Option int
@@ -43,7 +46,8 @@ const (
 	LLVMStyle
 )
 
-// Filter demangles a C++ symbol name, returning the human-readable C++ name.
+// Filter demangles a C++ or Rust symbol name,
+// returning the human-readable C++ or Rust name.
 // If any error occurs during demangling, the input string is returned.
 func Filter(name string, options ...Option) string {
 	ret, err := ToString(name, options...)
@@ -53,11 +57,14 @@ func Filter(name string, options ...Option) string {
 	return ret
 }
 
-// ToString demangles a C++ symbol name, returning a human-readable C++
-// name or an error.
-// If the name does not appear to be a C++ symbol name at all, the
-// error will be ErrNotMangledName.
+// ToString demangles a C++ or Rust symbol name,
+// returning a human-readable C++ or Rust name or an error.
+// If the name does not appear to be a C++ or Rust symbol name at all,
+// the error will be ErrNotMangledName.
 func ToString(name string, options ...Option) (string, error) {
+	if strings.HasPrefix(name, "_R") {
+		return rustToString(name, options)
+	}
 	a, err := ToAST(name, options...)
 	if err != nil {
 		return "", err
@@ -71,6 +78,7 @@ func ToString(name string, options ...Option) (string, error) {
 // the parameter types are not demangled.
 // If the name does not appear to be a C++ symbol name at all, the
 // error will be ErrNotMangledName.
+// This function does not currently support Rust symbol names.
 func ToAST(name string, options ...Option) (AST, error) {
 	if strings.HasPrefix(name, "_Z") {
 		a, err := doDemangle(name[2:], options...)

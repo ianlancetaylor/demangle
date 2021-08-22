@@ -11,6 +11,7 @@ import (
 
 // AST is an abstract syntax tree representing a C++ declaration.
 // This is sufficient for the demangler but is by no means a general C++ AST.
+// This abstract syntax tree is only used for C++ symbols, not Rust symbols.
 type AST interface {
 	// Internal method to convert to demangled string.
 	print(*printState)
