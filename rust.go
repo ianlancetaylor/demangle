@@ -372,7 +372,7 @@ func (rst *rustState) expandPunycode(s string) string {
 				break
 			}
 
-			if w >= math.MaxInt/base {
+			if w >= math.MaxInt32/base {
 				rst.fail("punycode number overflow")
 			}
 			w *= base - t
@@ -922,7 +922,7 @@ func (rst *rustState) decimalNumber() int {
 	val := 0
 	for len(rst.str) > 0 && isDigit(rst.str[0]) {
 		add := int(rst.str[0] - '0')
-		if val >= math.MaxInt/10-add {
+		if val >= math.MaxInt32/10-add {
 			rst.fail("decimal number overflow")
 		}
 		val *= 10
