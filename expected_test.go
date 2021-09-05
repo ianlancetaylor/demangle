@@ -138,7 +138,7 @@ func oneTest(t *testing.T, report int, input, expect string, params bool) {
 	}
 	if err != nil {
 		if exception {
-			t.Logf("%s:%d: ignore expected difference: got %q, expected %q", filename, report, err, expect)
+			t.Logf("%s:%d: ignore expected difference: got %q, want %q", filename, report, err, expect)
 			return
 		}
 
@@ -154,7 +154,7 @@ func oneTest(t *testing.T, report int, input, expect string, params bool) {
 
 	if s != expect {
 		if exception {
-			t.Logf("%s:%d: ignore expected difference: got %q, expected %q", filename, report, s, expect)
+			t.Logf("%s:%d: ignore expected difference: got %q, want %q", filename, report, s, expect)
 		} else {
 			var a AST
 			if params {
@@ -167,7 +167,7 @@ func oneTest(t *testing.T, report int, input, expect string, params bool) {
 			} else {
 				t.Logf("\n%#v", a)
 			}
-			t.Errorf("%s:%d: params: %t: got %q, expected %q", filename, report, params, s, expect)
+			t.Errorf("%s:%d: params: %t: got %q, want %q", filename, report, params, s, expect)
 		}
 	} else if exception && params {
 		t.Errorf("%s:%d: unexpected success (input listed in exceptions)", filename, report)

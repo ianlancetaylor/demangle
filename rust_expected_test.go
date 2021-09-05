@@ -84,7 +84,7 @@ func oneRustTest(t *testing.T, report int, input, expect string) {
 	}
 
 	if s != expect {
-		t.Errorf("%s:%d: got %q, expected %q", rustFilename, report, s, expect)
+		t.Errorf("%s:%d: got %q, want %q", rustFilename, report, s, expect)
 	}
 }
 
@@ -118,7 +118,7 @@ func TestRustCheck(t *testing.T) {
 				t.Errorf("%s:%d: %v", rustCheckFilename, report, err)
 			}
 		} else if got != want {
-			t.Errorf("%s:%d: got %q, expected %q", rustCheckFilename, report, got, want)
+			t.Errorf("%s:%d: got %q, want %q", rustCheckFilename, report, got, want)
 		}
 	}
 	if err := scanner.Err(); err != nil {
