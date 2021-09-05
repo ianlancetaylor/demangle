@@ -36,6 +36,11 @@ const (
 	// NoParams implies NoClones.
 	NoClones
 
+	// The NoRust option disables demangling of old-style Rust
+	// mangled names, which can be confused with C++ style mangled
+	// names. New style Rust mangled names are still recognized.
+	NoRust
+
 	// The Verbose option turns on more verbose demangling.
 	Verbose
 
@@ -65,6 +70,26 @@ func ToString(name string, options ...Option) (string, error) {
 	if strings.HasPrefix(name, "_R") {
 		return rustToString(name, options)
 	}
+
+	// Check for an old-style Rust mangled name.
+	// It starts with _ZN and ends with "17h" followed by 16 hex digits
+	// followed by "E".
+	if strings.HasPrefix(name, "_ZN") && strings.HasSuffix(name, "E") && len(name) > 23 && name[len(name)-20:len(name)-17] == "17h" {
+		noRust := false
+		for _, o := range options {
+			if o == NoRust {
+				noRust = true
+				break
+			}
+		}
+		if !noRust {
+			s, ok := oldRustToString(name, options)
+			if ok {
+				return s, nil
+			}
+		}
+	}
+
 	a, err := ToAST(name, options...)
 	if err != nil {
 		return "", err

@@ -47,13 +47,6 @@ func TestRustExpected(t *testing.T) {
 			}
 		}
 
-		// The libiberty testsuite tests for the old Rust
-		// demangling that starts with _Z, but we don't
-		// support that.
-		if !strings.HasPrefix(input, "_R") {
-			skip = true
-		}
-
 		if skip {
 			continue
 		}
