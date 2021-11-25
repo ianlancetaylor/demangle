@@ -954,7 +954,7 @@ func oldRustToString(name string, options []Option) (string, bool) {
 	// followed by "E". We check that the 16 characters are all hex digits.
 	// Also the hex digits must contain at least 5 distinct digits.
 	seen := uint16(0)
-	for i := len(name) - 17; i < len(name) - 1; i++ {
+	for i := len(name) - 17; i < len(name)-1; i++ {
 		digit, ok := hexDigit(name[i])
 		if !ok {
 			return "", false
@@ -1012,7 +1012,7 @@ func oldRustToString(name string, options []Option) (string, bool) {
 		for len(id) > 0 {
 			switch c := id[0]; c {
 			case '$':
-				codes := map[string]byte {
+				codes := map[string]byte{
 					"SP": '@',
 					"BP": '*',
 					"RF": '&',
