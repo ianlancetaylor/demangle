@@ -110,8 +110,10 @@ func (rst *rustState) writeString(s string) {
 	}
 }
 
-// <symbol-name> = "_R" [<decimal-number>] <path> [<instantiating-crate>]
-// <instantiating-crate> = <path>
+// symbolName parses:
+//
+//	<symbol-name> = "_R" [<decimal-number>] <path> [<instantiating-crate>]
+//	<instantiating-crate> = <path>
 //
 // We've already skipped the "_R".
 func (rst *rustState) symbolName() {
@@ -131,17 +133,19 @@ func (rst *rustState) symbolName() {
 	}
 }
 
-// <path> = "C" <identifier>                    // crate root
-//        | "M" <impl-path> <type>              // <T> (inherent impl)
-//        | "X" <impl-path> <type> <path>       // <T as Trait> (trait impl)
-//        | "Y" <type> <path>                   // <T as Trait> (trait definition)
-//        | "N" <namespace> <path> <identifier> // ...::ident (nested path)
-//        | "I" <path> {<generic-arg>} "E"      // ...<T, U> (generic args)
-//        | <backref>
-// <namespace> = "C"      // closure
-//             | "S"      // shim
-//             | <A-Z>    // other special namespaces
-//             | <a-z>    // internal namespaces
+// path parses:
+//
+//	<path> = "C" <identifier>                    // crate root
+//	       | "M" <impl-path> <type>              // <T> (inherent impl)
+//	       | "X" <impl-path> <type> <path>       // <T as Trait> (trait impl)
+//	       | "Y" <type> <path>                   // <T as Trait> (trait definition)
+//	       | "N" <namespace> <path> <identifier> // ...::ident (nested path)
+//	       | "I" <path> {<generic-arg>} "E"      // ...<T, U> (generic args)
+//	       | <backref>
+//	<namespace> = "C"      // closure
+//	            | "S"      // shim
+//	            | <A-Z>    // other special namespaces
+//	            | <a-z>    // internal namespaces
 //
 // needsSeparator is true if we need to write out :: for a generic;
 // it is passed as false if we are in the middle of a type.
@@ -237,7 +241,9 @@ func (rst *rustState) path(needsSeparator bool) {
 	}
 }
 
-// <impl-path> = [<disambiguator>] <path>
+// implPath parses:
+//
+//	<impl-path> = [<disambiguator>] <path>
 func (rst *rustState) implPath() {
 	// This path is not part of the demangled string.
 	hold := rst.skip
@@ -250,16 +256,20 @@ func (rst *rustState) implPath() {
 	rst.path(false)
 }
 
-// <identifier> = [<disambiguator>] <undisambiguated-identifier>
-// Returns the disambiguator and the identifier.
+// identifier parses:
+//
+//	<identifier> = [<disambiguator>] <undisambiguated-identifier>
+//
+// It returns the disambiguator and the identifier.
 func (rst *rustState) identifier() (int64, string) {
 	dis := rst.disambiguator()
 	ident := rst.undisambiguatedIdentifier()
 	return dis, ident
 }
 
-// <disambiguator> = "s" <base-62-number>
-// This is optional.
+// disambiguator parses an optional:
+//
+//	<disambiguator> = "s" <base-62-number>
 func (rst *rustState) disambiguator() int64 {
 	if len(rst.str) == 0 || rst.str[0] != 's' {
 		return 0
@@ -268,7 +278,9 @@ func (rst *rustState) disambiguator() int64 {
 	return rst.base62Number() + 1
 }
 
-// <undisambiguated-identifier> = ["u"] <decimal-number> ["_"] <bytes>
+// undisambiguatedIdentifier parses:
+//
+//	<undisambiguated-identifier> = ["u"] <decimal-number> ["_"] <bytes>
 func (rst *rustState) undisambiguatedIdentifier() string {
 	punycode := false
 	if len(rst.str) > 0 && rst.str[0] == 'u' {
@@ -409,10 +421,12 @@ func (rst *rustState) expandPunycode(s string) string {
 	return string(output)
 }
 
-// <generic-arg> = <lifetime>
-//               | <type>
-//               | "K" <const> // forward-compat for const generics
-// <lifetime> = "L" <base-62-number>
+// genericArg parses:
+//
+//	<generic-arg> = <lifetime>
+//	              | <type>
+//	              | "K" <const> // forward-compat for const generics
+//	<lifetime> = "L" <base-62-number>
 func (rst *rustState) genericArg() {
 	if len(rst.str) < 1 {
 		rst.fail("expected generic-arg")
@@ -428,8 +442,9 @@ func (rst *rustState) genericArg() {
 	}
 }
 
-// <binder> = "G" <base-62-number>
-// This is optional.
+// binder parses an optional:
+//
+//	<binder> = "G" <base-62-number>
 func (rst *rustState) binder() {
 	if len(rst.str) < 1 || rst.str[0] != 'G' {
 		return
@@ -454,18 +469,20 @@ func (rst *rustState) binder() {
 	rst.writeString("> ")
 }
 
-// <type> = <basic-type>
-//        | <path>                      // named type
-//        | "A" <type> <const>          // [T; N]
-//        | "S" <type>                  // [T]
-//        | "T" {<type>} "E"            // (T1, T2, T3, ...)
-//        | "R" [<lifetime>] <type>     // &T
-//        | "Q" [<lifetime>] <type>     // &mut T
-//        | "P" <type>                  // *const T
-//        | "O" <type>                  // *mut T
-//        | "F" <fn-sig>                // fn(...) -> ...
-//        | "D" <dyn-bounds> <lifetime> // dyn Trait<Assoc = X> + Send + 'a
-//        | <backref>
+// demangleType parses:
+//
+//	<type> = <basic-type>
+//	       | <path>                      // named type
+//	       | "A" <type> <const>          // [T; N]
+//	       | "S" <type>                  // [T]
+//	       | "T" {<type>} "E"            // (T1, T2, T3, ...)
+//	       | "R" [<lifetime>] <type>     // &T
+//	       | "Q" [<lifetime>] <type>     // &mut T
+//	       | "P" <type>                  // *const T
+//	       | "O" <type>                  // *mut T
+//	       | "F" <fn-sig>                // fn(...) -> ...
+//	       | "D" <dyn-bounds> <lifetime> // dyn Trait<Assoc = X> + Send + 'a
+//	       | <backref>
 func (rst *rustState) demangleType() {
 	if len(rst.str) < 1 {
 		rst.fail("expected type")
@@ -577,7 +594,9 @@ var rustBasicTypes = map[byte]string{
 	'z': "!",
 }
 
-// <basic-type>
+// basicType parses:
+//
+//	<basic-type>
 func (rst *rustState) basicType() {
 	if len(rst.str) < 1 {
 		rst.fail("expected basic type")
@@ -590,9 +609,11 @@ func (rst *rustState) basicType() {
 	rst.writeString(str)
 }
 
-// <fn-sig> = [<binder>] ["U"] ["K" <abi>] {<type>} "E" <type>
-// <abi> = "C"
-//       | <undisambiguated-identifier>
+// fnSig parses:
+//
+//	<fn-sig> = [<binder>] ["U"] ["K" <abi>] {<type>} "E" <type>
+//	<abi> = "C"
+//	      | <undisambiguated-identifier>
 func (rst *rustState) fnSig() {
 	rst.binder()
 	if len(rst.str) > 0 && rst.str[0] == 'U' {
@@ -632,7 +653,9 @@ func (rst *rustState) fnSig() {
 	}
 }
 
-// <dyn-bounds> = [<binder>] {<dyn-trait>} "E"
+// dynBounds parses:
+//
+//	<dyn-bounds> = [<binder>] {<dyn-trait>} "E"
 func (rst *rustState) dynBounds() {
 	rst.writeString("dyn ")
 	rst.binder()
@@ -648,8 +671,10 @@ func (rst *rustState) dynBounds() {
 	rst.checkChar('E')
 }
 
-// <dyn-trait> = <path> {<dyn-trait-assoc-binding>}
-// <dyn-trait-assoc-binding> = "p" <undisambiguated-identifier> <type>
+// dynTrait parses:
+//
+//	<dyn-trait> = <path> {<dyn-trait-assoc-binding>}
+//	<dyn-trait-assoc-binding> = "p" <undisambiguated-identifier> <type>
 func (rst *rustState) dynTrait() {
 	started := rst.pathStartGenerics()
 	for len(rst.str) > 0 && rst.str[0] == 'p' {
@@ -722,10 +747,12 @@ func (rst *rustState) writeLifetime(lifetime int64) {
 	}
 }
 
-// <const> = <type> <const-data>
-//         | "p" // placeholder, shown as _
-//         | <backref>
-// <const-data> = ["n"] {<hex-digit>} "_"
+// demangleConst parses:
+//
+//	<const> = <type> <const-data>
+//	        | "p" // placeholder, shown as _
+//	        | <backref>
+//	<const-data> = ["n"] {<hex-digit>} "_"
 func (rst *rustState) demangleConst() {
 	if len(rst.str) < 1 {
 		rst.fail("expected constant")
@@ -856,7 +883,9 @@ digitLoop:
 	}
 }
 
-// <base-62-number> = {<0-9a-zA-Z>} "_"
+// base62Number parses:
+//
+//	<base-62-number> = {<0-9a-zA-Z>} "_"
 func (rst *rustState) base62Number() int64 {
 	if len(rst.str) > 0 && rst.str[0] == '_' {
 		rst.advance(1)
@@ -884,7 +913,9 @@ func (rst *rustState) base62Number() int64 {
 	return 0
 }
 
-// <backref> = "B" <base-62-number>
+// backref parses:
+//
+//	<backref> = "B" <base-62-number>
 func (rst *rustState) backref(demangle func()) {
 	backoff := rst.off
 
