@@ -2890,9 +2890,9 @@ func (st *state) unnamedTypeName() AST {
 // but are added by GCC when cloning functions.
 func (st *state) cloneSuffix(a AST) AST {
 	i := 0
-	if len(st.str) > 1 && st.str[0] == '.' && (isLower(st.str[1]) || st.str[1] == '_') {
+	if len(st.str) > 1 && st.str[0] == '.' && (isLower(st.str[1]) || isDigit(st.str[1]) || st.str[1] == '_') {
 		i += 2
-		for len(st.str) > i && (isLower(st.str[i]) || st.str[i] == '_') {
+		for len(st.str) > i && (isLower(st.str[i]) || isDigit(st.str[i]) || st.str[i] == '_') {
 			i++
 		}
 	}
