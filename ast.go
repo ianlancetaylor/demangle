@@ -2520,6 +2520,7 @@ func (u *Unary) print(ps *printState) {
 	}
 
 	if !u.Suffix {
+		isDelete := op != nil && (op.Name == "delete " || op.Name == "delete[] ")
 		if op != nil && op.Name == "::" {
 			// Don't use parentheses after ::.
 			ps.print(expr)
@@ -2534,11 +2535,11 @@ func (u *Unary) print(ps *printState) {
 			ps.print(expr)
 			ps.writeByte(')')
 		} else if ps.llvmStyle {
-			if op == nil || op.Name != `operator"" ` {
+			if op == nil || (op.Name != `operator"" ` && !isDelete) {
 				ps.writeByte('(')
 			}
 			ps.print(expr)
-			if op == nil || op.Name != `operator"" ` {
+			if op == nil || (op.Name != `operator"" ` && !isDelete) {
 				ps.writeByte(')')
 			}
 		} else {
@@ -3146,8 +3147,20 @@ type New struct {
 }
 
 func (n *New) print(ps *printState) {
-	// Op doesn't really matter for printing--we always print "new".
-	ps.writeString("new ")
+	if !ps.llvmStyle {
+		// Op doesn't really matter for printing--we always print "new".
+		ps.writeString("new ")
+	} else {
+		op, _ := n.Op.(*Operator)
+		if op != nil {
+			ps.writeString(op.Name)
+			if n.Place == nil {
+				ps.writeByte(' ')
+			}
+		} else {
+			ps.print(n.Op)
+		}
+	}
 	if n.Place != nil {
 		parenthesize(ps, n.Place)
 		ps.writeByte(' ')
