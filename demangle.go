@@ -1579,24 +1579,32 @@ func (st *state) demangleType(isCast bool) AST {
 
 		case 'F':
 			accum := false
+			bits := 0
 			if len(st.str) > 0 && isDigit(st.str[0]) {
 				accum = true
-				// We don't care about the bits.
-				_ = st.number()
+				bits = st.number()
 			}
-			base := st.demangleType(isCast)
-			if len(st.str) > 0 && isDigit(st.str[0]) {
-				// We don't care about the bits.
-				st.number()
-			}
-			sat := false
-			if len(st.str) > 0 {
-				if st.str[0] == 's' {
-					sat = true
+			if len(st.str) > 0 && st.str[0] == '_' {
+				if bits == 0 {
+					st.fail("expected non-zero number of bits")
 				}
 				st.advance(1)
+				ret = &BinaryFP{Bits: bits}
+			} else {
+				base := st.demangleType(isCast)
+				if len(st.str) > 0 && isDigit(st.str[0]) {
+					// We don't care about the bits.
+					st.number()
+				}
+				sat := false
+				if len(st.str) > 0 {
+					if st.str[0] == 's' {
+						sat = true
+					}
+					st.advance(1)
+				}
+				ret = &FixedType{Base: base, Accum: accum, Sat: sat}
 			}
-			ret = &FixedType{Base: base, Accum: accum, Sat: sat}
 
 		case 'v':
 			ret = st.vectorType(isCast)

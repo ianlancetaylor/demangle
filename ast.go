@@ -1451,6 +1451,34 @@ func (ft *FixedType) goString(indent int, field string) string {
 		ft.Base.goString(indent+2, "Base: "))
 }
 
+// BinaryFP is a binary floating-point type.
+type BinaryFP struct {
+	Bits int
+}
+
+func (bfp *BinaryFP) print(ps *printState) {
+	fmt.Fprintf(&ps.buf, "_Float%d", bfp.Bits)
+}
+
+func (bfp *BinaryFP) Traverse(fn func(AST) bool) {
+	fn(bfp)
+}
+
+func (bfp *BinaryFP) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(bfp) {
+		return nil
+	}
+	return fn(bfp)
+}
+
+func (bfp *BinaryFP) GoString() string {
+	return bfp.goString(0, "")
+}
+
+func (bfp *BinaryFP) goString(indent int, field string) string {
+	return fmt.Sprintf("%*s%sBinaryFP: %d", indent, "", field, bfp.Bits)
+}
+
 // VectorType is a vector type.
 type VectorType struct {
 	Dimension AST
