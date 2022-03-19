@@ -105,7 +105,7 @@ func TestRustCheck(t *testing.T) {
 		lineno++
 		input := strings.TrimSpace(scanner.Text())
 
-		got, err := ToString(input)
+		got, err := ToString(input, LLVMStyle)
 		if err != nil {
 			if want != input {
 				t.Errorf("%s:%d: %v", rustCheckFilename, report, err)

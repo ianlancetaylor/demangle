@@ -47,10 +47,19 @@ func rustToString(name string, options []Option) (ret string, err error) {
 	}
 
 	if suffix != "" {
-		rst.skip = false
-		rst.writeString(" (")
-		rst.writeString(suffix)
-		rst.writeByte(')')
+		llvmStyle := false
+		for _, o := range options {
+			if o == LLVMStyle {
+				llvmStyle = true
+				break
+			}
+		}
+		if llvmStyle {
+			rst.skip = false
+			rst.writeString(" (")
+			rst.writeString(suffix)
+			rst.writeByte(')')
+		}
 	}
 
 	return rst.buf.String(), nil

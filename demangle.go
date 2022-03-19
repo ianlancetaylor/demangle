@@ -73,19 +73,26 @@ func ToString(name string, options ...Option) (string, error) {
 
 	// Check for an old-style Rust mangled name.
 	// It starts with _ZN and ends with "17h" followed by 16 hex digits
-	// followed by "E".
-	if strings.HasPrefix(name, "_ZN") && strings.HasSuffix(name, "E") && len(name) > 23 && name[len(name)-20:len(name)-17] == "17h" {
-		noRust := false
-		for _, o := range options {
-			if o == NoRust {
-				noRust = true
-				break
-			}
+	// followed by "E" followed by an optional suffix starting with "."
+	// (which we ignore).
+	if strings.HasPrefix(name, "_ZN") {
+		rname := name
+		if pos := strings.LastIndex(rname, "E."); pos > 0 {
+			rname = rname[:pos+1]
 		}
-		if !noRust {
-			s, ok := oldRustToString(name, options)
-			if ok {
-				return s, nil
+		if strings.HasSuffix(rname, "E") && len(rname) > 23 && rname[len(rname)-20:len(rname)-17] == "17h" {
+			noRust := false
+			for _, o := range options {
+				if o == NoRust {
+					noRust = true
+					break
+				}
+			}
+			if !noRust {
+				s, ok := oldRustToString(rname, options)
+				if ok {
+					return s, nil
+				}
 			}
 		}
 	}
