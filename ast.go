@@ -2681,6 +2681,9 @@ func (b *Binary) print(ps *printState) {
 		case ".", "->":
 			skipBothParens = true
 			addSpaces = false
+		case "->*":
+			skipParens = true
+			addSpaces = false
 		}
 	}
 
