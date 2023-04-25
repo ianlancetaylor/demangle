@@ -40,6 +40,13 @@ func rustToString(name string, options []Option) (ret string, err error) {
 
 	name = name[2:]
 	rst := &rustState{orig: name, str: name}
+
+	for _, o := range options {
+		if o == NoRustGenericTypeParams {
+			rst.skipGenericTypeParams = true
+		}
+	}
+
 	rst.symbolName()
 
 	if len(rst.str) > 0 {
@@ -74,6 +81,8 @@ type rustState struct {
 	skip      bool            // don't print, just skip
 	lifetimes int64           // number of bound lifetimes
 	last      byte            // last byte written to buffer
+
+	skipGenericTypeParams bool // skip generic type parameters
 }
 
 // fail panics with demangleErr, to be caught in rustToString.
@@ -105,6 +114,7 @@ func (rst *rustState) writeByte(c byte) {
 		return
 	}
 	rst.last = c
+
 	rst.buf.WriteByte(c)
 }
 
@@ -239,7 +249,14 @@ func (rst *rustState) path(needsSeparator bool) {
 			} else {
 				rst.writeString(", ")
 			}
+			previousSkipValue := rst.skip
+			if !previousSkipValue && rst.skipGenericTypeParams {
+				rst.skip = false
+				rst.writeByte('T')
+				rst.skip = true
+			}
 			rst.genericArg()
+			rst.skip = previousSkipValue
 		}
 		rst.writeByte('>')
 		rst.checkChar('E')

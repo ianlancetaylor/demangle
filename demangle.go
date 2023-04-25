@@ -41,6 +41,10 @@ const (
 	// names. New style Rust mangled names are still recognized.
 	NoRust
 
+	// The NoRustGenericTypeParams option disables demangling of generic type
+	// parameters in rust functions.
+	NoRustGenericTypeParams
+
 	// The Verbose option turns on more verbose demangling.
 	Verbose
 
