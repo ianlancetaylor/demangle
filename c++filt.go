@@ -42,6 +42,7 @@ var noVerbose = flag.Bool("i", false, "Do not show implementation details (if an
 var help = flag.Bool("h", false, "Display help information")
 var debug = flag.Bool("d", false, "Display debugging information for strings on command line")
 var llvm = flag.Bool("llvm", false, "Demangle strings in LLVM style")
+var maxLen = flag.Int("m", 0, "Maximum length as power of 2, between 1 and 30")
 
 // Unimplemented c++filt flags:
 // -n (opposite of -_)
@@ -144,6 +145,9 @@ func options() []demangle.Option {
 	}
 	if *llvm {
 		options = append(options, demangle.LLVMStyle)
+	}
+	if *maxLen > 0 {
+		options = append(options, demangle.MaxLength(*maxLen))
 	}
 	return options
 }

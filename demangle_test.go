@@ -467,3 +467,18 @@ func TestFailure(t *testing.T) {
 		}
 	}
 }
+
+func TestMaxLength(t *testing.T) {
+	if isMaxLength(Option(0)) {
+		t.Errorf("isMaxLength(0) returned true")
+	}
+	for pow := 1; pow <= 30; pow++ {
+		opt := MaxLength(pow)
+		if !isMaxLength(opt) {
+			t.Errorf("isMaxLength(%x) returned false", opt)
+		}
+		if got := maxLength(opt); got != 1<<pow {
+			t.Errorf("maxLength(%x) = %v, want %v", opt, got, 1<<pow)
+		}
+	}
+}

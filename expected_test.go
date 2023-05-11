@@ -172,6 +172,15 @@ func oneTest(t *testing.T, report int, input, expect string, params bool) {
 	} else if exception && params {
 		t.Errorf("%s:%d: unexpected success (input listed in exceptions)", filename, report)
 	}
+
+	if s == expect && s != input && params && len(expect) > 200 {
+		ss, err := ToString(input, MaxLength(6))
+		if err != nil {
+			t.Errorf("%s:%d: error with MaxLength: %v", filename, report, err)
+		} else if ss != expect[:64] {
+			t.Errorf("%s:%d: MaxLength mismatch: %q != %q", filename, report, ss, expect[:64])
+		}
+	}
 }
 
 // getLine reads a line from demangle-expected.
