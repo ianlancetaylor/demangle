@@ -79,6 +79,15 @@ func oneRustTest(t *testing.T, report int, input, expect string) {
 	if s != expect {
 		t.Errorf("%s:%d: got %q, want %q", rustFilename, report, s, expect)
 	}
+
+	if s == expect && s != input && len(expect) > 64 {
+		ss, err := ToString(input, MaxLength(6))
+		if err != nil {
+			t.Errorf("%s:%d: error with MaxLength: %v", rustFilename, report, err)
+		} else if ss != expect[:64] {
+			t.Errorf("%s:%d: MaxLength mismatch: %q != %q", rustFilename, report, ss, expect[:64])
+		}
+	}
 }
 
 const rustCheckFilename = "testdata/rust.test"
