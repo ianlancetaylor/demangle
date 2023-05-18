@@ -323,6 +323,13 @@ func TestDemangler(t *testing.T) {
 			"D::E std::A::B::C::J(std::A::B::V const*, F::G::I const&)",
 			"std::A::B::C::J",
 		},
+		{
+			"_ZGVZNK1A1B1CIZNKS0_1DIXadL_ZNS_1EIvE1FEvEES4_EcvNS_1GIFT_DpT0_EEEIvJEvEEvEUlPS4_E_S4_EcvSB_IvJEEEvE1H",
+			"guard variable for A::B::C<A::B::D<&A::E<void>::F, A::E<void> >::operator A::G<void (()...)><void, void>() const::{lambda(A::E<void>*)#1}, A::E<void> >::operator A::G<void (()...)><void>() const::H",
+			"guard variable for A::B::C<A::B::D<&A::E<void>::F, A::E<void> >::operator A::G<void (()...)><void, void>() const::{lambda(A::E<void>*)#1}, A::E<void> >::operator A::G<void (()...)><void>() const::H",
+			"guard variable for A::B::C::operator A::G() const::H",
+			"guard variable for A::B::C::operator A::G() const::H",
+		},
 	}
 
 	for _, test := range tests {
