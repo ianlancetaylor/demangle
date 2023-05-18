@@ -77,7 +77,7 @@ func isMaxLength(opt Option) bool {
 
 // maxLength returns the maximum length stored in an Option.
 func maxLength(opt Option) int {
-	return 1 << ((opt&maxLengthMask) >> maxLengthShift)
+	return 1 << ((opt & maxLengthMask) >> maxLengthShift)
 }
 
 // Filter demangles a C++ or Rust symbol name,
