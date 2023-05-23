@@ -39,6 +39,7 @@ If no names are provided on the command line, stdin is read.`)
 var stripUnderscore = flag.Bool("_", false, "Ignore first leading underscore")
 var noParams = flag.Bool("p", false, "Do not display function argument types")
 var noTemplateParams = flag.Bool("T", false, "Do not display template parameters")
+var noEnclosingParams = flag.Bool("e", false, "Do not display enclosing parameters")
 var noVerbose = flag.Bool("i", false, "Do not show implementation details (if any)")
 var help = flag.Bool("h", false, "Display help information")
 var debug = flag.Bool("d", false, "Display debugging information for strings on command line")
@@ -143,6 +144,9 @@ func options() []demangle.Option {
 	}
 	if *noTemplateParams {
 		options = append(options, demangle.NoTemplateParams)
+	}
+	if *noEnclosingParams {
+		options = append(options, demangle.NoEnclosingParams)
 	}
 	if !*noVerbose {
 		options = append(options, demangle.Verbose)

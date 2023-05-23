@@ -16,17 +16,19 @@ import (
 // the same but we weren't initially.
 func TestDemangler(t *testing.T) {
 	var tests = []struct {
-		input                string
-		want                 string
-		wantNoParams         string
-		wantNoTemplateParams string
-		wantMinimal          string
+		input                 string
+		want                  string
+		wantNoParams          string
+		wantNoTemplateParams  string
+		wantNoEnclosingParams string
+		wantMinimal           string
 	}{
 		{
 			"_ZNSaIcEC1ERKS_",
 			"std::allocator<char>::allocator(std::allocator<char> const&)",
 			"std::allocator<char>::allocator",
 			"std::allocator::allocator(std::allocator const&)",
+			"std::allocator<char>::allocator(std::allocator<char> const&)",
 			"std::allocator::allocator",
 		},
 		{
@@ -34,6 +36,7 @@ func TestDemangler(t *testing.T) {
 			"__gnu_cxx::stdio_filebuf<char, std::char_traits<char> >::stdio_filebuf(_IO_FILE*, std::_Ios_Openmode, unsigned long)",
 			"__gnu_cxx::stdio_filebuf<char, std::char_traits<char> >::stdio_filebuf",
 			"__gnu_cxx::stdio_filebuf::stdio_filebuf(_IO_FILE*, std::_Ios_Openmode, unsigned long)",
+			"__gnu_cxx::stdio_filebuf<char, std::char_traits<char> >::stdio_filebuf(_IO_FILE*, std::_Ios_Openmode, unsigned long)",
 			"__gnu_cxx::stdio_filebuf::stdio_filebuf",
 		},
 		{
@@ -41,6 +44,7 @@ func TestDemangler(t *testing.T) {
 			"n::C::operator n::D<E><E>()",
 			"n::C::operator n::D<E><E>",
 			"n::C::operator n::D()",
+			"n::C::operator n::D<E><E>()",
 			"n::C::operator n::D",
 		},
 		{
@@ -48,6 +52,7 @@ func TestDemangler(t *testing.T) {
 			"G<false, void, D::E::F<double>*, double>::H* C<void, D::E::F<double>*, double>(void (*)(D::E::F<double>*, double), H::I::J<D::E::F<double>*>::K, H::I::J<double>::K)",
 			"C<void, D::E::F<double>*, double>",
 			"G::H* C(void (*)(D::E::F*, double), H::I::J::K, H::I::J::K)",
+			"G<false, void, D::E::F<double>*, double>::H* C<void, D::E::F<double>*, double>(void (*)(D::E::F<double>*, double), H::I::J<D::E::F<double>*>::K, H::I::J<double>::K)",
 			"C",
 		},
 		{
@@ -55,6 +60,7 @@ func TestDemangler(t *testing.T) {
 			"C<D<char, std::E<char>, std::allocator<char> > >::F() const::F",
 			"C<D<char, std::E<char>, std::allocator<char> > >::F() const::F",
 			"C::F() const::F",
+			"C<D<char, std::E<char>, std::allocator<char> > >::F() const::F",
 			"C::F() const::F",
 		},
 		{
@@ -62,6 +68,7 @@ func TestDemangler(t *testing.T) {
 			"void C<D, std::E<F const, G::H> >::I::J<std::E<F const, G::H> const&>(std::E<F const, G::H> const&)",
 			"C<D, std::E<F const, G::H> >::I::J<std::E<F const, G::H> const&>",
 			"void C::I::J(std::E const&)",
+			"void C<D, std::E<F const, G::H> >::I::J<std::E<F const, G::H> const&>(std::E<F const, G::H> const&)",
 			"C::I::J",
 		},
 		{
@@ -69,6 +76,7 @@ func TestDemangler(t *testing.T) {
 			"void C::D::E::F<>(int, G)",
 			"C::D::E::F<>",
 			"void C::D::E::F(int, G)",
+			"void C::D::E::F<>(int, G)",
 			"C::D::E::F",
 		},
 		{
@@ -76,12 +84,14 @@ func TestDemangler(t *testing.T) {
 			"C<50u, true>::D()",
 			"C<50u, true>::D",
 			"C::D()",
+			"C<50u, true>::D()",
 			"C::D",
 		},
 		{
 			"_ZN1CUt_C2Ev",
 			"C::{unnamed type#1}::{unnamed type#1}()",
 			"C::{unnamed type#1}::{unnamed type#1}",
+			"C::{unnamed type#1}::{unnamed type#1}()",
 			"C::{unnamed type#1}::{unnamed type#1}()",
 			"C::{unnamed type#1}::{unnamed type#1}",
 		},
@@ -90,6 +100,7 @@ func TestDemangler(t *testing.T) {
 			"F::G<decltype (&((((C::E)()).H)()))> C::(anonymous namespace)::D<C::E>(C::E const&, C::I::J)",
 			"C::(anonymous namespace)::D<C::E>",
 			"F::G C::(anonymous namespace)::D(C::E const&, C::I::J)",
+			"F::G<decltype (&((((C::E)()).H)()))> C::(anonymous namespace)::D<C::E>(C::E const&, C::I::J)",
 			"C::(anonymous namespace)::D",
 		},
 		{
@@ -97,6 +108,7 @@ func TestDemangler(t *testing.T) {
 			"void C<D>::E<int, int&, char const*&, char const (&) [1], char const (&) [1], bool, char const*&, int&, unsigned int&, F::G const*&, H::I const*&>(int&&, int&, char const*&, char const (&) [1], char const (&) [1], bool&&, char const*&, int&, unsigned int&, F::G const*&, H::I const*&)",
 			"C<D>::E<int, int&, char const*&, char const (&) [1], char const (&) [1], bool, char const*&, int&, unsigned int&, F::G const*&, H::I const*&>",
 			"void C::E(int&&, int&, char const*&, char const (&) [1], char const (&) [1], bool&&, char const*&, int&, unsigned int&, F::G const*&, H::I const*&)",
+			"void C<D>::E<int, int&, char const*&, char const (&) [1], char const (&) [1], bool, char const*&, int&, unsigned int&, F::G const*&, H::I const*&>(int&&, int&, char const*&, char const (&) [1], char const (&) [1], bool&&, char const*&, int&, unsigned int&, F::G const*&, H::I const*&)",
 			"C::E",
 		},
 		{
@@ -104,6 +116,7 @@ func TestDemangler(t *testing.T) {
 			"void C::(anonymous namespace)::D<bool (C::E const*)>(C::F*, bool (&)(C::E const*) const)",
 			"C::(anonymous namespace)::D<bool (C::E const*)>",
 			"void C::(anonymous namespace)::D(C::F*, bool (&)(C::E const*) const)",
+			"void C::(anonymous namespace)::D<bool (C::E const*)>(C::F*, bool (&)(C::E const*) const)",
 			"C::(anonymous namespace)::D",
 		},
 		{
@@ -111,6 +124,7 @@ func TestDemangler(t *testing.T) {
 			"C::D::K::L<std::M<void (&)(int, std::F<void (G::H::I const&)>, std::vector<C::J, std::allocator<C::J> > const&)>::N, std::M<int&>::N, std::M<std::F<void (G::H::I const&)> >::N> C::D::E<void (&)(int, std::F<void (G::H::I const&)>, std::vector<C::J, std::allocator<C::J> > const&), int&, std::F<void (G::H::I const&)>, void>(void (&)(int, std::F<void (G::H::I const&)>, std::vector<C::J, std::allocator<C::J> > const&), int&, std::F<void (G::H::I const&)>&&)",
 			"C::D::E<void (&)(int, std::F<void (G::H::I const&)>, std::vector<C::J, std::allocator<C::J> > const&), int&, std::F<void (G::H::I const&)>, void>",
 			"C::D::K::L C::D::E(void (&)(int, std::F, std::vector const&), int&, std::F&&)",
+			"C::D::K::L<std::M<void (&)(int, std::F<void (G::H::I const&)>, std::vector<C::J, std::allocator<C::J> > const&)>::N, std::M<int&>::N, std::M<std::F<void (G::H::I const&)> >::N> C::D::E<void (&)(int, std::F<void (G::H::I const&)>, std::vector<C::J, std::allocator<C::J> > const&), int&, std::F<void (G::H::I const&)>, void>(void (&)(int, std::F<void (G::H::I const&)>, std::vector<C::J, std::allocator<C::J> > const&), int&, std::F<void (G::H::I const&)>&&)",
 			"C::D::E",
 		},
 		{
@@ -118,6 +132,7 @@ func TestDemangler(t *testing.T) {
 			"C::D::E::F::operator C::G<H><H>()",
 			"C::D::E::F::operator C::G<H><H>",
 			"C::D::E::F::operator C::G()",
+			"C::D::E::F::operator C::G<H><H>()",
 			"C::D::E::F::operator C::G",
 		},
 		{
@@ -125,6 +140,7 @@ func TestDemangler(t *testing.T) {
 			"__gnu_cxx::__normal_iterator<E<F::G::H> const*, std::vector<E<F::G::H>, std::allocator<E<F::G::H> > > >::__normal_iterator<E<F::G::H>*>(__gnu_cxx::__normal_iterator<E<F::G::H>*, __gnu_cxx::__enable_if<std::__are_same<E<F::G::H>*, E<F::G::H>*>::__value, std::vector<E<F::G::H>, std::allocator<E<F::G::H> > > >::I> const&)",
 			"__gnu_cxx::__normal_iterator<E<F::G::H> const*, std::vector<E<F::G::H>, std::allocator<E<F::G::H> > > >::__normal_iterator<E<F::G::H>*>",
 			"__gnu_cxx::__normal_iterator::__normal_iterator(__gnu_cxx::__normal_iterator const&)",
+			"__gnu_cxx::__normal_iterator<E<F::G::H> const*, std::vector<E<F::G::H>, std::allocator<E<F::G::H> > > >::__normal_iterator<E<F::G::H>*>(__gnu_cxx::__normal_iterator<E<F::G::H>*, __gnu_cxx::__enable_if<std::__are_same<E<F::G::H>*, E<F::G::H>*>::__value, std::vector<E<F::G::H>, std::allocator<E<F::G::H> > > >::I> const&)",
 			"__gnu_cxx::__normal_iterator::__normal_iterator",
 		},
 		{
@@ -132,6 +148,7 @@ func TestDemangler(t *testing.T) {
 			"unsigned int std::C<unsigned int (D::*)() const>::operator()<void>(D const*) const",
 			"std::C<unsigned int (D::*)() const>::operator()<void>",
 			"unsigned int std::C::operator()(D const*) const",
+			"unsigned int std::C<unsigned int (D::*)() const>::operator()<void>(D const*) const",
 			"std::C::operator()",
 		},
 		{
@@ -139,6 +156,7 @@ func TestDemangler(t *testing.T) {
 			"void std::_Hashtable<basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E>, std::allocator<std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E> >, std::__detail::_Select1st, std::equal_to<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::_M_assign<std::_Hashtable<basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E>, std::allocator<std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E> >, std::__detail::_Select1st, std::equal_to<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::_Hashtable(std::_Hashtable<basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E>, std::allocator<std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E> >, std::__detail::_Select1st, std::equal_to<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> > const&)::{lambda(std::__detail::_Hash_node<std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E>, true> const*)#1}>(std::_Hashtable<basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E>, std::allocator<std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E> >, std::__detail::_Select1st, std::equal_to<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> > const&, std::_Hashtable<basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E>, std::allocator<std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E> >, std::__detail::_Select1st, std::equal_to<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::_Hashtable(std::_Hashtable<basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E>, std::allocator<std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E> >, std::__detail::_Select1st, std::equal_to<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> > const&)::{lambda(std::__detail::_Hash_node<std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E>, true> const*)#1} const&)",
 			"std::_Hashtable<basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E>, std::allocator<std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E> >, std::__detail::_Select1st, std::equal_to<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::_M_assign<std::_Hashtable<basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E>, std::allocator<std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E> >, std::__detail::_Select1st, std::equal_to<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::_Hashtable(std::_Hashtable<basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E>, std::allocator<std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E> >, std::__detail::_Select1st, std::equal_to<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> > const&)::{lambda(std::__detail::_Hash_node<std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E>, true> const*)#1}>",
 			"void std::_Hashtable::_M_assign(std::_Hashtable const&, std::_Hashtable::_Hashtable(std::_Hashtable const&)::{lambda(std::__detail::_Hash_node const*)#1} const&)",
+			"void std::_Hashtable<basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E>, std::allocator<std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E> >, std::__detail::_Select1st, std::equal_to<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::_M_assign<std::_Hashtable<basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E>, std::allocator<std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E> >, std::__detail::_Select1st, std::equal_to<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::_Hashtable()::{lambda(std::__detail::_Hash_node<std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E>, true> const*)#1}>(std::_Hashtable<basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E>, std::allocator<std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E> >, std::__detail::_Select1st, std::equal_to<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> > const&, std::_Hashtable<basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E>, std::allocator<std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E> >, std::__detail::_Select1st, std::equal_to<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::_Hashtable()::{lambda(std::__detail::_Hash_node<std::pair<basic_string<char, std::char_traits<char>, std::allocator<char> > const, C::D::E>, true> const*)#1} const&)",
 			"std::_Hashtable::_M_assign",
 		},
 		{
@@ -146,6 +164,7 @@ func TestDemangler(t *testing.T) {
 			"double const volatile& std::max<double volatile>(double const volatile&, double const volatile&)",
 			"std::max<double volatile>",
 			"double const volatile& std::max(double const volatile&, double const volatile&)",
+			"double const volatile& std::max<double volatile>(double const volatile&, double const volatile&)",
 			"std::max",
 		},
 		{
@@ -153,10 +172,12 @@ func TestDemangler(t *testing.T) {
 			"C::D::E::F::G::H()::{lambda()#1}::{lambda()#1}({lambda()#1}&&)",
 			"C::D::E::F::G::H()::{lambda()#1}::{lambda()#1}",
 			"C::D::E::F::G::H()::{lambda()#1}::{lambda()#1}({lambda()#1}&&)",
+			"C::D::E::F::G::H()::{lambda()#1}::{lambda()#1}({lambda()#1}&&)",
 			"C::D::E::F::G::H()::{lambda()#1}::{lambda()#1}",
 		},
 		{
 			"_ZThn8_NK1C1D1EEv",
+			"non-virtual thunk to C::D::E() const",
 			"non-virtual thunk to C::D::E() const",
 			"non-virtual thunk to C::D::E() const",
 			"non-virtual thunk to C::D::E() const",
@@ -168,9 +189,11 @@ func TestDemangler(t *testing.T) {
 			"virtual thunk to C::D::E::F() const",
 			"virtual thunk to C::D::E::F() const",
 			"virtual thunk to C::D::E::F() const",
+			"virtual thunk to C::D::E::F() const",
 		},
 		{
 			"_ZTCSt9strstream16_So",
+			"construction vtable for std::ostream-in-std::strstream",
 			"construction vtable for std::ostream-in-std::strstream",
 			"construction vtable for std::ostream-in-std::strstream",
 			"construction vtable for std::ostream-in-std::strstream",
@@ -182,16 +205,19 @@ func TestDemangler(t *testing.T) {
 			"guard variable for C::D::E()::$_0::operator()() const::F",
 			"guard variable for C::D::E()::$_0::operator()() const::F",
 			"guard variable for C::D::E()::$_0::operator()() const::F",
+			"guard variable for C::D::E()::$_0::operator()() const::F",
 		},
 		{
 			"_Z1fICiEvT_",
 			"void f<int _Complex>(int _Complex)",
 			"f<int _Complex>",
 			"void f(int _Complex)",
+			"void f<int _Complex>(int _Complex)",
 			"f",
 		},
 		{
 			"_GLOBAL__D__Z2fnv",
+			"global destructors keyed to fn()",
 			"global destructors keyed to fn()",
 			"global destructors keyed to fn()",
 			"global destructors keyed to fn()",
@@ -202,6 +228,7 @@ func TestDemangler(t *testing.T) {
 			"void f<&h>()",
 			"f<&h>",
 			"void f()",
+			"void f<&h>()",
 			"f",
 		},
 		{
@@ -209,6 +236,7 @@ func TestDemangler(t *testing.T) {
 			"int C<D*>(E const&, D**, F::G<D*, H<D*>::I&&(!H<D*>::J)>::K)",
 			"C<D*>",
 			"int C(E const&, D**, F::G::K)",
+			"int C<D*>(E const&, D**, F::G<D*, H<D*>::I&&(!H<D*>::J)>::K)",
 			"C",
 		},
 		{
@@ -216,6 +244,7 @@ func TestDemangler(t *testing.T) {
 			"A::B::C::D<E::F::G<E::H, I>(void (E::J::*)(L*, E::H const*, I*, K*), E::H const*, L*, I*, K*)::{lambda()#1}, false>::operator K*<K, void, void>() &&",
 			"A::B::C::D<E::F::G<E::H, I>(void (E::J::*)(L*, E::H const*, I*, K*), E::H const*, L*, I*, K*)::{lambda()#1}, false>::operator K*<K, void, void>",
 			"A::B::C::D::operator K*() &&",
+			"A::B::C::D<E::F::G<E::H, I>()::{lambda()#1}, false>::operator K*<K, void, void>() &&",
 			"A::B::C::D::operator K*",
 		},
 		{
@@ -223,6 +252,7 @@ func TestDemangler(t *testing.T) {
 			"std::A<std::B<unsigned long, unsigned int> (unsigned int), C::D<E>(char const*, G::H::I<decltype (&E::operator())>, G&&)::{lambda(unsigned int)#1}>::K(std::L const&, unsigned int)",
 			"std::A<std::B<unsigned long, unsigned int> (unsigned int), C::D<E>(char const*, G::H::I<decltype (&E::operator())>, G&&)::{lambda(unsigned int)#1}>::K",
 			"std::A::K(std::L const&, unsigned int)",
+			"std::A<std::B<unsigned long, unsigned int> (unsigned int), C::D<E>()::{lambda(unsigned int)#1}>::K(std::L const&, unsigned int)",
 			"std::A::K",
 		},
 		{
@@ -230,6 +260,7 @@ func TestDemangler(t *testing.T) {
 			"std::A::E<F<int*>::G&&H<int, std::A::I<F>::J>::K, void>::L std::A::B<int, std::A::C<int> >::D<int*>(F, F)",
 			"std::A::B<int, std::A::C<int> >::D<int*>",
 			"std::A::E::L std::A::B::D(F, F)",
+			"std::A::E<F<int*>::G&&H<int, std::A::I<F>::J>::K, void>::L std::A::B<int, std::A::C<int> >::D<int*>(F, F)",
 			"std::A::B::D",
 		},
 		{
@@ -237,10 +268,12 @@ func TestDemangler(t *testing.T) {
 			"decltype (((i<A::B::C::j<std::tuple<A::B::C::k<E::F::G<E::F::H<E::F::I<E::F::J> >, E::F::K>(std::vector<Q::R, std::allocator<Q::R> > const&, gtl::S::T<U::V> const&, E::F::W::X const&, E::F::Y const&, gtl::Z<E::F::a> const&, std::unordered_map<Q::R, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> >, L::g::h<void>, std::equal_to<Q::R>, std::allocator<std::pair<Q::R const, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> > > > >*, E::F::K const&)::{lambda(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >)#1}::operator()(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >) const::{lambda(E::F::I<E::F::J>)#1}&&>, A::B::C::k<E::F::G<E::F::H<E::F::I<E::F::J> >, E::F::K>(std::vector<Q::R, std::allocator<Q::R> > const&, gtl::S::T<U::V> const&, E::F::W::X const&, E::F::Y const&, gtl::Z<E::F::a> const&, std::unordered_map<Q::R, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> >, L::g::h<void>, std::equal_to<Q::R>, std::allocator<std::pair<Q::R const, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> > > > >*, E::F::K const&)::{lambda(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >)#1}::operator()(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >) const::{lambda(E::F::I<U::d>)#2}&&> >, E::F::I<E::F::J>&>::l>)((m<std::tuple<A::B::C::k<E::F::G<E::F::H<E::F::I<E::F::J> >, E::F::K>(std::vector<Q::R, std::allocator<Q::R> > const&, gtl::S::T<U::V> const&, E::F::W::X const&, E::F::Y const&, gtl::Z<E::F::a> const&, std::unordered_map<Q::R, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> >, L::g::h<void>, std::equal_to<Q::R>, std::allocator<std::pair<Q::R const, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> > > > >*, E::F::K const&)::{lambda(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >)#1}::operator()(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >) const::{lambda(E::F::I<E::F::J>)#1}&&>, A::B::C::k<E::F::G<E::F::H<E::F::I<E::F::J> >, E::F::K>(std::vector<Q::R, std::allocator<Q::R> > const&, gtl::S::T<U::V> const&, E::F::W::X const&, E::F::Y const&, gtl::Z<E::F::a> const&, std::unordered_map<Q::R, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> >, L::g::h<void>, std::equal_to<Q::R>, std::allocator<std::pair<Q::R const, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> > > > >*, E::F::K const&)::{lambda(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >)#1}::operator()(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >) const::{lambda(E::F::I<U::d>)#2}&&> > >)()))((m<E::F::I<E::F::J>&>)())) A::B::C::D<E::F::G<E::F::H<E::F::I<E::F::J> >, E::F::K>(std::vector<Q::R, std::allocator<Q::R> > const&, gtl::S::T<U::V> const&, E::F::W::X const&, E::F::Y const&, gtl::Z<E::F::a> const&, std::unordered_map<Q::R, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> >, L::g::h<void>, std::equal_to<Q::R>, std::allocator<std::pair<Q::R const, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> > > > >*, E::F::K const&)::{lambda(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >)#1}::operator()(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >) const::{lambda(E::F::I<E::F::J>)#1}&&, E::F::G<E::F::H<E::F::I<E::F::J> >, E::F::K>(std::vector<Q::R, std::allocator<Q::R> > const&, gtl::S::T<U::V> const&, E::F::W::X const&, E::F::Y const&, gtl::Z<E::F::a> const&, std::unordered_map<Q::R, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> >, L::g::h<void>, std::equal_to<Q::R>, std::allocator<std::pair<Q::R const, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> > > > >*, E::F::K const&)::{lambda(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >)#1}::operator()(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >) const::{lambda(E::F::I<U::d>)#2}&&>::operator()<E::F::I<E::F::J>&>(E::F::I<E::F::J>&) &&",
 			"A::B::C::D<E::F::G<E::F::H<E::F::I<E::F::J> >, E::F::K>(std::vector<Q::R, std::allocator<Q::R> > const&, gtl::S::T<U::V> const&, E::F::W::X const&, E::F::Y const&, gtl::Z<E::F::a> const&, std::unordered_map<Q::R, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> >, L::g::h<void>, std::equal_to<Q::R>, std::allocator<std::pair<Q::R const, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> > > > >*, E::F::K const&)::{lambda(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >)#1}::operator()(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >) const::{lambda(E::F::I<E::F::J>)#1}&&, E::F::G<E::F::H<E::F::I<E::F::J> >, E::F::K>(std::vector<Q::R, std::allocator<Q::R> > const&, gtl::S::T<U::V> const&, E::F::W::X const&, E::F::Y const&, gtl::Z<E::F::a> const&, std::unordered_map<Q::R, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> >, L::g::h<void>, std::equal_to<Q::R>, std::allocator<std::pair<Q::R const, Q::UniquePtr<E::F::b<A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >, E::F::f> > > > >*, E::F::K const&)::{lambda(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >)#1}::operator()(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >) const::{lambda(E::F::I<U::d>)#2}&&>::operator()<E::F::I<E::F::J>&>",
 			"decltype (((i)((m)()))((m)())) A::B::C::D::operator()(E::F::I&) &&",
+			"decltype (((i<A::B::C::j<std::tuple<A::B::C::k<E::F::G<E::F::H<E::F::I<E::F::J> >, E::F::K>()::{lambda(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >)#1}::operator()() const::{lambda(E::F::I<E::F::J>)#1}&&>, A::B::C::k<E::F::G<E::F::H<E::F::I<E::F::J> >, E::F::K>()::{lambda(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >)#1}::operator()() const::{lambda(E::F::I<U::d>)#2}&&> >, E::F::I<E::F::J>&>::l>)((m<std::tuple<A::B::C::k<E::F::G<E::F::H<E::F::I<E::F::J> >, E::F::K>()::{lambda(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >)#1}::operator()() const::{lambda(E::F::I<E::F::J>)#1}&&>, A::B::C::k<E::F::G<E::F::H<E::F::I<E::F::J> >, E::F::K>()::{lambda(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >)#1}::operator()() const::{lambda(E::F::I<U::d>)#2}&&> > >)()))((m<E::F::I<E::F::J>&>)())) A::B::C::D<E::F::G<E::F::H<E::F::I<E::F::J> >, E::F::K>()::{lambda(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >)#1}::operator()() const::{lambda(E::F::I<E::F::J>)#1}&&, E::F::G<E::F::H<E::F::I<E::F::J> >, E::F::K>()::{lambda(Q::R, unsigned long, unsigned long, A::B::c<E::F::I<E::F::J>, E::F::I<U::d> >)#1}::operator()() const::{lambda(E::F::I<U::d>)#2}&&>::operator()<E::F::I<E::F::J>&>(E::F::I<E::F::J>&) &&",
 			"A::B::C::D::operator()",
 		},
 		{
 			"_ZcvAna_eE_e",
+			"operator long double [new long double]",
 			"operator long double [new long double]",
 			"operator long double [new long double]",
 			"operator long double [new long double]",
@@ -251,13 +284,15 @@ func TestDemangler(t *testing.T) {
 			"i(() restrict)::long double (long double)(() restrict) restrict",
 			"i(long double (long double) restrict)::long double (long double)",
 			"i(() restrict)::long double (long double)(() restrict) restrict",
-			"i(long double (long double) restrict)::long double (long double)",
+			"i()::long double (long double)(() restrict) restrict",
+			"i()::long double (long double)",
 		},
 		{
 			"_Z1_VFaeEZS_S_ES_",
 			"_((() volatile) volatile, signed char (long double)(() volatile) volatile::(() volatile) volatile)",
 			"_",
 			"_((() volatile) volatile, signed char (long double)(() volatile) volatile::(() volatile) volatile)",
+			"_(() volatile, signed char (long double)() volatile::() volatile)",
 			"_",
 		},
 		{
@@ -265,6 +300,7 @@ func TestDemangler(t *testing.T) {
 			"operator.*(( ( _Imaginary)( _Imaginary) restrict) restrict, long (int)( ( _Imaginary)( _Imaginary) restrict) restrict::operator ( ( _Imaginary)( _Imaginary) restrict) restrict)",
 			"operator.*",
 			"operator.*(( ( _Imaginary)( _Imaginary) restrict) restrict, long (int)( ( _Imaginary)( _Imaginary) restrict) restrict::operator ( ( _Imaginary)( _Imaginary) restrict) restrict)",
+			"operator.*(() restrict, long (int)() restrict::operator () restrict)",
 			"operator.*",
 		},
 		{
@@ -272,13 +308,15 @@ func TestDemangler(t *testing.T) {
 			"A::B::C<float>(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F<float (int, int)> const&, bool, bool, int*)::{lambda(A::B::C<float>(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F<float (int, int)> const&, bool, bool, int*)::G, A::B::C<float>(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F<float (int, int)> const&, bool, bool, int*)::G)#1}::operator()(A::B::C<float>(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F<float (int, int)> const&, bool, bool, int*)::G, A::B::C<float>(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F<float (int, int)> const&, bool, bool, int*)::G) const",
 			"A::B::C<float>(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F<float (int, int)> const&, bool, bool, int*)::{lambda(A::B::C<float>(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F<float (int, int)> const&, bool, bool, int*)::G, A::B::C<float>(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F<float (int, int)> const&, bool, bool, int*)::G)#1}::operator()",
 			"A::B::C(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F const&, bool, bool, int*)::{lambda(A::B::C(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F const&, bool, bool, int*)::G, A::B::C(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F const&, bool, bool, int*)::G)#1}::operator()(A::B::C(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F const&, bool, bool, int*)::G, A::B::C(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F const&, bool, bool, int*)::G) const",
-			"A::B::C(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F const&, bool, bool, int*)::{lambda(A::B::C(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F const&, bool, bool, int*)::G, A::B::C(A::D*, A::E const&, int, A::E const&, float, float, float, std::__u::F const&, bool, bool, int*)::G)#1}::operator()",
+			"A::B::C<float>()::{lambda(A::B::C<float>()::G, A::B::C<float>()::G)#1}::operator()(A::B::C<float>()::G, A::B::C<float>()::G) const",
+			"A::B::C()::{lambda(A::B::C()::G, A::B::C()::G)#1}::operator()",
 		},
 		{
 			"_ZN1A1B1CIJLNS_1DE131067ELS2_4EEEC2EUa9enable_ifIXclL_ZNS0_1EIJLS2_131067ELS2_4EEEEbNSt1F1GIcNS5_1HIcEEEEEfL0p_EEEPKc",
 			"A::B::C<(A::D)131067, (A::D)4>::C(char const*) [enable_if:bool A::B::E<(A::D)131067, (A::D)4>(std::F::G<char, std::F::H<char> >)({parm#1})]",
 			"A::B::C<(A::D)131067, (A::D)4>::C",
 			"A::B::C::C(char const*) [enable_if:bool A::B::E(std::F::G)({parm#1})]",
+			"A::B::C<(A::D)131067, (A::D)4>::C(char const*) [enable_if:bool A::B::E<(A::D)131067, (A::D)4>(std::F::G<char, std::F::H<char> >)({parm#1})]",
 			"A::B::C::C",
 		},
 		{
@@ -286,6 +324,7 @@ func TestDemangler(t *testing.T) {
 			"decltype (((decltype (std::S::T<A::B::E<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(auto:1&)#1} const> const&>(0)) std::J::R<A::B::E<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(auto:1&)#1} const> const&>()()).(operator()<0ul>))((U<0ul>)(std std::J::R<std::J::P<F::Q<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > > >, F::Q<F::N<int, long long> > > const&>()()))) A::B::C::D<A::B::E<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(auto:1&)#1} const>, std::J::P<F::Q<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > > >, F::Q<F::N<int, long long> > > const&>::operator()<0ul>() const",
 			"A::B::C::D<A::B::E<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(auto:1&)#1} const>, std::J::P<F::Q<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > > >, F::Q<F::N<int, long long> > > const&>::operator()<0ul>",
 			"decltype (((decltype (std::S::T(0)) std::J::R()()).(operator()))((U)(std std::J::R()()))) A::B::C::D::operator()() const",
+			"decltype (((decltype (std::S::T<A::B::E<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(auto:1&)#1} const> const&>(0)) std::J::R<A::B::E<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(auto:1&)#1} const> const&>()()).(operator()<0ul>))((U<0ul>)(std std::J::R<std::J::P<F::Q<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > > >, F::Q<F::N<int, long long> > > const&>()()))) A::B::C::D<A::B::E<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(auto:1&)#1} const>, std::J::P<F::Q<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > > >, F::Q<F::N<int, long long> > > const&>::operator()<0ul>() const",
 			"A::B::C::D::operator()",
 		},
 		{
@@ -293,6 +332,7 @@ func TestDemangler(t *testing.T) {
 			"A::B::C<D::E::F<D::G<std::H::I<char, std::H::J<char>, std::H::K<char> >, int>, D::G<int, long long> >::L()::{lambda(auto:1&)#1} const>::C(D::E::F<D::G<std::H::I<char, std::H::J<char>, std::H::K<char> >, int>, D::G<int, long long> >::L()::{lambda(auto:1&)#1} const*)",
 			"A::B::C<D::E::F<D::G<std::H::I<char, std::H::J<char>, std::H::K<char> >, int>, D::G<int, long long> >::L()::{lambda(auto:1&)#1} const>::C",
 			"A::B::C::C(D::E::F::L()::{lambda(auto:1&)#1} const*)",
+			"A::B::C<D::E::F<D::G<std::H::I<char, std::H::J<char>, std::H::K<char> >, int>, D::G<int, long long> >::L()::{lambda(auto:1&)#1} const>::C(D::E::F<D::G<std::H::I<char, std::H::J<char>, std::H::K<char> >, int>, D::G<int, long long> >::L()::{lambda(auto:1&)#1} const*)",
 			"A::B::C::C",
 		},
 		{
@@ -300,6 +340,7 @@ func TestDemangler(t *testing.T) {
 			"void A::B::C<false, void, D::E::F<D::E::G, D::E::H, D::E::I>::J()::{lambda()#2}&&>(A::B::K*)",
 			"A::B::C<false, void, D::E::F<D::E::G, D::E::H, D::E::I>::J()::{lambda()#2}&&>",
 			"void A::B::C(A::B::K*)",
+			"void A::B::C<false, void, D::E::F<D::E::G, D::E::H, D::E::I>::J()::{lambda()#2}&&>(A::B::K*)",
 			"A::B::C",
 		},
 		{
@@ -307,6 +348,7 @@ func TestDemangler(t *testing.T) {
 			"decltype ((K<A::C::K<short, L<std::G::H<char, std::G::I<char>, std::G::J<char> > > restrict>::N<A::C::M<A::C::D<A::E, A::F> >::N>::N::N>)(({parm#1}.O)(), {parm#2})) A::B<A::C::D<A::E, A::F>, std::G::H<char, std::G::I<char>, std::G::J<char> > >(A::P<L> const&, char const*)",
 			"A::B<A::C::D<A::E, A::F>, std::G::H<char, std::G::I<char>, std::G::J<char> > >",
 			"decltype ((K)(({parm#1}.O)(), {parm#2})) A::B(A::P const&, char const*)",
+			"decltype ((K<A::C::K<short, L<std::G::H<char, std::G::I<char>, std::G::J<char> > > restrict>::N<A::C::M<A::C::D<A::E, A::F> >::N>::N::N>)(({parm#1}.O)(), {parm#2})) A::B<A::C::D<A::E, A::F>, std::G::H<char, std::G::I<char>, std::G::J<char> > >(A::P<L> const&, char const*)",
 			"A::B",
 		},
 		{
@@ -314,6 +356,7 @@ func TestDemangler(t *testing.T) {
 			"std::A::B::C<D::E::F::G<D::E::H::I(int, long long, long long)::J>(L::M*, std::A::O<char, std::A::P<char> >, std)::{lambda()#1}, Q::R<std::A::S<std::A::K<decltype ((std::declval<decltype ((std::declval<D::E::H::I(int, long long, long long)::J>())()) ()>())()) ()>::T::U::V, D::E::H::W> > ()>::operator()()",
 			"std::A::B::C<D::E::F::G<D::E::H::I(int, long long, long long)::J>(L::M*, std::A::O<char, std::A::P<char> >, std)::{lambda()#1}, Q::R<std::A::S<std::A::K<decltype ((std::declval<decltype ((std::declval<D::E::H::I(int, long long, long long)::J>())()) ()>())()) ()>::T::U::V, D::E::H::W> > ()>::operator()",
 			"std::A::B::C::operator()()",
+			"std::A::B::C<D::E::F::G<D::E::H::I()::J>()::{lambda()#1}, Q::R<std::A::S<std::A::K<decltype ((std::declval<decltype ((std::declval<D::E::H::I()::J>())()) ()>())()) ()>::T::U::V, D::E::H::W> > ()>::operator()()",
 			"std::A::B::C::operator()",
 		},
 		{
@@ -321,6 +364,7 @@ func TestDemangler(t *testing.T) {
 			"D::E<F::G::H> std::A::B::C<D::E<F::G::H> (F::G::I const&)>::J<std::A::B::K<L::M<D::N<F::G::I, F::G::H>, F::G::(anonymous namespace)::O, F::G::I, F::G::H>(std::A::T<D::N<F::G::I, F::G::H> const>, L::U, F::G::(anonymous namespace)::O)::{lambda(F::G::I const&)#1}, D::E<F::G::H> (F::G::I const&)> >(std::A::B::V const*, F::G::I const&)",
 			"std::A::B::C<D::E<F::G::H> (F::G::I const&)>::J<std::A::B::K<L::M<D::N<F::G::I, F::G::H>, F::G::(anonymous namespace)::O, F::G::I, F::G::H>(std::A::T<D::N<F::G::I, F::G::H> const>, L::U, F::G::(anonymous namespace)::O)::{lambda(F::G::I const&)#1}, D::E<F::G::H> (F::G::I const&)> >",
 			"D::E std::A::B::C::J(std::A::B::V const*, F::G::I const&)",
+			"D::E<F::G::H> std::A::B::C<D::E<F::G::H> (F::G::I const&)>::J<std::A::B::K<L::M<D::N<F::G::I, F::G::H>, F::G::(anonymous namespace)::O, F::G::I, F::G::H>()::{lambda(F::G::I const&)#1}, D::E<F::G::H> (F::G::I const&)> >(std::A::B::V const*, F::G::I const&)",
 			"std::A::B::C::J",
 		},
 		{
@@ -328,6 +372,7 @@ func TestDemangler(t *testing.T) {
 			"guard variable for A::B::C<A::B::D<&A::E<void>::F, A::E<void> >::operator A::G<void (()...)><void, void>() const::{lambda(A::E<void>*)#1}, A::E<void> >::operator A::G<void (()...)><void>() const::H",
 			"guard variable for A::B::C<A::B::D<&A::E<void>::F, A::E<void> >::operator A::G<void (()...)><void, void>() const::{lambda(A::E<void>*)#1}, A::E<void> >::operator A::G<void (()...)><void>() const::H",
 			"guard variable for A::B::C::operator A::G() const::H",
+			"guard variable for A::B::C<A::B::D<&A::E<void>::F, A::E<void> >::operator A::G<void (()...)><void, void>() const::{lambda(A::E<void>*)#1}, A::E<void> >::operator A::G<void (()...)><void>() const::H",
 			"guard variable for A::B::C::operator A::G() const::H",
 		},
 	}
@@ -351,7 +396,13 @@ func TestDemangler(t *testing.T) {
 			t.Errorf("demangling NoTemplateParams %s: got %s, want %s", test.input, got, test.wantNoTemplateParams)
 		}
 
-		if got, err := ToString(test.input, NoParams, NoTemplateParams); err != nil {
+		if got, err := ToString(test.input, NoEnclosingParams); err != nil {
+			t.Errorf("demangling NoEnclosingParams %s: unexpected error %v", test.input, err)
+		} else if got != test.wantNoEnclosingParams {
+			t.Errorf("demangling NoEnclosingParams %s: got %s, want %s", test.input, got, test.wantNoEnclosingParams)
+		}
+
+		if got, err := ToString(test.input, NoParams, NoTemplateParams, NoEnclosingParams); err != nil {
 			t.Errorf("demangling NoTemplateParams %s: unexpected error %v", test.input, err)
 		} else if got != test.wantMinimal {
 			t.Errorf("demangling Minimal %s: got %s, want %s", test.input, got, test.wantMinimal)
