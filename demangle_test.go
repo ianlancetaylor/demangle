@@ -375,6 +375,14 @@ func TestDemangler(t *testing.T) {
 			"guard variable for A::B::C<A::B::D<&A::E<void>::F, A::E<void> >::operator A::G<void (()...)><void, void>() const::{lambda(A::E<void>*)#1}, A::E<void> >::operator A::G<void (()...)><void>() const::H",
 			"guard variable for A::B::C::operator A::G() const::H",
 		},
+		{
+			"_ZNKSt2Cr1AIN1B1CENS_1DIS2_EEEcvbB7v170000Ev",
+			"std::Cr::A<B::C, std::Cr::D<B::C> >::operator bool[abi:v170000]() const",
+			"std::Cr::A<B::C, std::Cr::D<B::C> >::operator bool[abi:v170000]",
+			"std::Cr::A::operator bool[abi:v170000]() const",
+			"std::Cr::A<B::C, std::Cr::D<B::C> >::operator bool[abi:v170000]() const",
+			"std::Cr::A::operator bool[abi:v170000]",
+		},
 	}
 
 	for _, test := range tests {
