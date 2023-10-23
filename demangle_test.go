@@ -233,10 +233,10 @@ func TestDemangler(t *testing.T) {
 		},
 		{
 			"_Z1CIP1DEiRK1EPT_N1F1GIS5_Xaasr1HIS5_E1IntsrSA_1JEE1KE",
-			"int C<D*>(E const&, D**, F::G<D*, H<D*>::I&&(!H<D*>::J)>::K)",
+			"int C<D*>(E const&, D**, F::G<D*, H<D*>::I&&(!H::J)>::K)",
 			"C<D*>",
 			"int C(E const&, D**, F::G::K)",
-			"int C<D*>(E const&, D**, F::G<D*, H<D*>::I&&(!H<D*>::J)>::K)",
+			"int C<D*>(E const&, D**, F::G<D*, H<D*>::I&&(!H::J)>::K)",
 			"C",
 		},
 		{
@@ -249,8 +249,8 @@ func TestDemangler(t *testing.T) {
 		},
 		{
 			"_ZNSt1AIFSt1BImjEjEZN1C1DI1EEENSt1FIXeqsr1G1H1IIDTadsrT_onclEEE1JLi2EEvE1KEPKcSC_OS7_EUljE_E1KERKSt1Lj",
-			"std::A<std::B<unsigned long, unsigned int> (unsigned int), C::D<E>(char const*, G::H::I<decltype (&E::operator())>, G&&)::{lambda(unsigned int)#1}>::K(std::L const&, unsigned int)",
-			"std::A<std::B<unsigned long, unsigned int> (unsigned int), C::D<E>(char const*, G::H::I<decltype (&E::operator())>, G&&)::{lambda(unsigned int)#1}>::K",
+			"std::A<std::B<unsigned long, unsigned int> (unsigned int), C::D<E>(char const*, char const, I&&)::{lambda(unsigned int)#1}>::K(std::L const&, unsigned int)",
+			"std::A<std::B<unsigned long, unsigned int> (unsigned int), C::D<E>(char const*, char const, I&&)::{lambda(unsigned int)#1}>::K",
 			"std::A::K(std::L const&, unsigned int)",
 			"std::A<std::B<unsigned long, unsigned int> (unsigned int), C::D<E>()::{lambda(unsigned int)#1}>::K(std::L const&, unsigned int)",
 			"std::A::K",
@@ -321,10 +321,10 @@ func TestDemangler(t *testing.T) {
 		},
 		{
 			"_ZNK1A1B1C1DINS0_1EIKZNK1F1G1HIJNS4_1IINSt1J1KIcNS8_1LIcEENS8_1MIcEEEEEENS4_1NIixEEEE1OEvEUlRT_E_EERKNS8_1PIJNS4_1QISF_EENSP_ISH_EEEEEEclILm0EEEDTcldtclL_ZNS8_1RIRKSN_EEDTclsr3std1SE1TISJ_ELi0EEEvEEonclIXT_EEcl1UIXT_EEclL_ZNSX_ISU_EES10_vEEEEEv",
-			"decltype (((decltype (std::S::T<A::B::E<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(auto:1&)#1} const> const&>(0)) std::J::R<A::B::E<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(auto:1&)#1} const> const&>()()).(operator()<0ul>))((U<0ul>)(std std::J::R<std::J::P<F::Q<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > > >, F::Q<F::N<int, long long> > > const&>()()))) A::B::C::D<A::B::E<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(auto:1&)#1} const>, std::J::P<F::Q<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > > >, F::Q<F::N<int, long long> > > const&>::operator()<0ul>() const",
+			"decltype (((decltype (std::S::T<A::B::E<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(auto:1&)#1} const> const&>(0)) std::J::R<A::B::E<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(auto:1&)#1} const> const&>()()).(operator()<0ul>))((U<0ul>)(decltype (std::S::T<std::J::P<F::Q<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > > >, F::Q<F::N<int, long long> > > const&>(0)) std::J::R<std::J::P<F::Q<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > > >, F::Q<F::N<int, long long> > > const&>()()))) A::B::C::D<A::B::E<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(auto:1&)#1} const>, std::J::P<F::Q<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > > >, F::Q<F::N<int, long long> > > const&>::operator()<0ul>() const",
 			"A::B::C::D<A::B::E<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(auto:1&)#1} const>, std::J::P<F::Q<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > > >, F::Q<F::N<int, long long> > > const&>::operator()<0ul>",
-			"decltype (((decltype (std::S::T(0)) std::J::R()()).(operator()))((U)(std std::J::R()()))) A::B::C::D::operator()() const",
-			"decltype (((decltype (std::S::T<A::B::E<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(auto:1&)#1} const> const&>(0)) std::J::R<A::B::E<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(auto:1&)#1} const> const&>()()).(operator()<0ul>))((U<0ul>)(std std::J::R<std::J::P<F::Q<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > > >, F::Q<F::N<int, long long> > > const&>()()))) A::B::C::D<A::B::E<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(auto:1&)#1} const>, std::J::P<F::Q<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > > >, F::Q<F::N<int, long long> > > const&>::operator()<0ul>() const",
+			"decltype (((decltype (std::S::T(0)) std::J::R()()).(operator()))((U)(decltype (std::S::T(0)) std::J::R()()))) A::B::C::D::operator()() const",
+			"decltype (((decltype (std::S::T<A::B::E<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(auto:1&)#1} const> const&>(0)) std::J::R<A::B::E<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(auto:1&)#1} const> const&>()()).(operator()<0ul>))((U<0ul>)(decltype (std::S::T<std::J::P<F::Q<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > > >, F::Q<F::N<int, long long> > > const&>(0)) std::J::R<std::J::P<F::Q<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > > >, F::Q<F::N<int, long long> > > const&>()()))) A::B::C::D<A::B::E<F::G::H<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > >, F::N<int, long long> >::O() const::{lambda(auto:1&)#1} const>, std::J::P<F::Q<F::I<std::J::K<char, std::J::L<char>, std::J::M<char> > > >, F::Q<F::N<int, long long> > > const&>::operator()<0ul>() const",
 			"A::B::C::D::operator()",
 		},
 		{
@@ -353,10 +353,10 @@ func TestDemangler(t *testing.T) {
 		},
 		{
 			"_ZNSt1A1B1CIZN1D1E1F1GIZNS3_1H1IEixxE1JEENS_1KIFDTclclsr3stdE7declvalIT_EEEEvEEEPN1L1MENS_1OIcNS_1PIcEEEES9_EUlvE_FN1Q1RINS_1SIJNSD_1T1U1VENS6_1WEEEEEEvEEclEv",
-			"std::A::B::C<D::E::F::G<D::E::H::I(int, long long, long long)::J>(L::M*, std::A::O<char, std::A::P<char> >, std)::{lambda()#1}, Q::R<std::A::S<std::A::K<decltype ((std::declval<decltype ((std::declval<D::E::H::I(int, long long, long long)::J>())()) ()>())()) ()>::T::U::V, D::E::H::W> > ()>::operator()()",
-			"std::A::B::C<D::E::F::G<D::E::H::I(int, long long, long long)::J>(L::M*, std::A::O<char, std::A::P<char> >, std)::{lambda()#1}, Q::R<std::A::S<std::A::K<decltype ((std::declval<decltype ((std::declval<D::E::H::I(int, long long, long long)::J>())()) ()>())()) ()>::T::U::V, D::E::H::W> > ()>::operator()",
+			"std::A::B::C<D::E::F::G<D::E::H::I(int, long long, long long)::J>(L::M*, std::A::O<char, std::A::P<char> >, D::E::H::I(int, long long, long long)::J)::{lambda()#1}, Q::R<std::A::S<L::T::U::V, D::E::H::W> > ()>::operator()()",
+			"std::A::B::C<D::E::F::G<D::E::H::I(int, long long, long long)::J>(L::M*, std::A::O<char, std::A::P<char> >, D::E::H::I(int, long long, long long)::J)::{lambda()#1}, Q::R<std::A::S<L::T::U::V, D::E::H::W> > ()>::operator()",
 			"std::A::B::C::operator()()",
-			"std::A::B::C<D::E::F::G<D::E::H::I()::J>()::{lambda()#1}, Q::R<std::A::S<std::A::K<decltype ((std::declval<decltype ((std::declval<D::E::H::I()::J>())()) ()>())()) ()>::T::U::V, D::E::H::W> > ()>::operator()()",
+			"std::A::B::C<D::E::F::G<D::E::H::I()::J>()::{lambda()#1}, Q::R<std::A::S<L::T::U::V, D::E::H::W> > ()>::operator()()",
 			"std::A::B::C::operator()",
 		},
 		{
@@ -382,6 +382,14 @@ func TestDemangler(t *testing.T) {
 			"std::Cr::A::operator bool[abi:v170000]() const",
 			"std::Cr::A<B::C, std::Cr::D<B::C> >::operator bool[abi:v170000]() const",
 			"std::Cr::A::operator bool[abi:v170000]",
+		},
+		{
+			"_ZN1A1B1CIZN1D1E1FINS2_2KVINSt3__u1GIcNS6_1HIcEENS6_1IIcEEEESC_EEEENS_1JERKN1K1L1M1NENS_1OIFvvEEENSL_IFvRKT_EEEPNS6_1PIXsr1Q1R1SISO_EE1TENSH_1TISO_EENSH_1UISO_EEE1VEEUlRKNSH_1WES13_E_vJS13_S13_EEET0_NS0_1XEDpNS0_1YIT1_E1ZE",
+			"void A::B::C<D::E::F<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > >(K::L::M::N const&, A::O<void ()>, A::O<void (D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > const&)>, std::__u::P<Q::R::S<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > >::T, K::L::M::T<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > >, K::L::M::U<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > > >::V*)::{lambda(K::L::M::W const&, K::L::M::W const)#1}, void, K::L::M::W const, K::L::M::W const>(A::B::X, A::B::Y<K::L::M::W const>::Z, A::B::Y<K::L::M::W const>::Z)",
+			"A::B::C<D::E::F<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > >(K::L::M::N const&, A::O<void ()>, A::O<void (D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > const&)>, std::__u::P<Q::R::S<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > >::T, K::L::M::T<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > >, K::L::M::U<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > > >::V*)::{lambda(K::L::M::W const&, K::L::M::W const)#1}, void, K::L::M::W const, K::L::M::W const>",
+			"void A::B::C(A::B::X, A::B::Y::Z, A::B::Y::Z)",
+			"void A::B::C<D::E::F<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > >()::{lambda(K::L::M::W const&, K::L::M::W const)#1}, void, K::L::M::W const, K::L::M::W const>(A::B::X, A::B::Y<K::L::M::W const>::Z, A::B::Y<K::L::M::W const>::Z)",
+			"A::B::C",
 		},
 	}
 
