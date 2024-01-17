@@ -87,6 +87,7 @@ func main() {
 	}
 
 	scanner := bufio.NewScanner(bufio.NewReader(os.Stdin))
+	scanner.Buffer(nil, 1<<30)
 	for scanner.Scan() {
 		line := scanner.Text()
 		start := -1
@@ -112,6 +113,10 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(2)
 		}
+	}
+	if err := scanner.Err(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
 	}
 }
 
