@@ -1607,6 +1607,53 @@ func (bfp *BinaryFP) goString(indent int, field string) string {
 	return fmt.Sprintf("%*s%sBinaryFP: %d", indent, "", field, bfp.Bits)
 }
 
+// BitIntType is the C++23 _BitInt(N) type.
+type BitIntType struct {
+	Size   AST
+	Signed bool
+}
+
+func (bt *BitIntType) print(ps *printState) {
+	if !bt.Signed {
+		ps.writeString("unsigned ")
+	}
+	ps.writeString("_BitInt")
+	ps.startScope('(')
+	ps.print(bt.Size)
+	ps.endScope(')')
+}
+
+func (bt *BitIntType) Traverse(fn func(AST) bool) {
+	if fn(bt) {
+		bt.Size.Traverse(fn)
+	}
+}
+
+func (bt *BitIntType) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(bt) {
+		return nil
+	}
+	size := bt.Size.Copy(fn, skip)
+	if size == nil {
+		return fn(bt)
+	}
+	bt = &BitIntType{Size: size, Signed: bt.Signed}
+	if r := fn(bt); r != nil {
+		return r
+	}
+	return bt
+}
+
+func (bt *BitIntType) GoString() string {
+	return bt.goString(0, "")
+}
+
+func (bt *BitIntType) goString(indent int, field string) string {
+	return fmt.Sprintf("%*s%sBitIntType: Signed: %t\n%s", indent, "", field,
+		bt.Signed,
+		bt.Size.goString(indent+2, "Size: "))
+}
+
 // VectorType is a vector type.
 type VectorType struct {
 	Dimension AST

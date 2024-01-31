@@ -1660,6 +1660,21 @@ func (st *state) demangleType(isCast bool) AST {
 			ret = st.vectorType(isCast)
 			addSubst = true
 
+		case 'B', 'U':
+			signed := c2 == 'B'
+			var size AST
+			if len(st.str) > 0 && isDigit(st.str[0]) {
+				bits := st.number()
+				size = &Name{Name: fmt.Sprintf("%d", bits)}
+			} else {
+				size = st.expression()
+			}
+			if len(st.str) == 0 || st.str[0] != '_' {
+				st.fail("expected _ after _BitInt size")
+			}
+			st.advance(1)
+			ret = &BitIntType{Size: size, Signed: signed}
+
 		default:
 			st.fail("unrecognized D code in type")
 		}
