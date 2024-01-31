@@ -59,6 +59,7 @@ func ASTToString(a AST, options ...Option) string {
 		enclosingParams: enclosingParams,
 		llvmStyle:       llvmStyle,
 		max:             max,
+		scopes:          1,
 	}
 	a.print(&ps)
 	s := ps.buf.String()
@@ -74,6 +75,17 @@ type printState struct {
 	enclosingParams bool // whether to print enclosing parameters
 	llvmStyle       bool
 	max             int // maximum output length
+
+	// The scopes field is used to avoid unnecessary parentheses
+	// around expressions that use > (or >>). It is incremented if
+	// we output a parenthesis or something else that means that >
+	// or >> won't be treated as ending a template. It starts out
+	// as 1, and is set to 0 when we start writing template
+	// arguments. We add parentheses around expressions using > if
+	// scopes is 0. The effect is that an expression with > gets
+	// parentheses if used as a template argument that is not
+	// inside some other set of parentheses.
+	scopes int
 
 	buf  strings.Builder
 	last byte // Last byte written to buffer.
@@ -132,6 +144,87 @@ func (ps *printState) print(a AST) {
 	ps.printing = ps.printing[:len(ps.printing)-1]
 }
 
+// printList prints a list of AST values separated by commas,
+// optionally skipping some.
+func (ps *printState) printList(args []AST, skip func(AST) bool) {
+	first := true
+	for _, a := range args {
+		if skip != nil && skip(a) {
+			continue
+		}
+		if !first {
+			ps.writeString(", ")
+		}
+
+		needsParen := false
+		if ps.llvmStyle {
+			if p, ok := a.(hasPrec); ok {
+				if p.prec() >= precComma {
+					needsParen = true
+				}
+			}
+		}
+		if needsParen {
+			ps.startScope('(')
+		}
+
+		ps.print(a)
+
+		if needsParen {
+			ps.endScope(')')
+		}
+
+		first = false
+	}
+}
+
+// startScope starts a scope. This is used to decide whether we need
+// to parenthesize an expression using > or >>.
+func (ps *printState) startScope(b byte) {
+	ps.scopes++
+	ps.writeByte(b)
+}
+
+// endScope closes a scope.
+func (ps *printState) endScope(b byte) {
+	ps.scopes--
+	ps.writeByte(b)
+}
+
+// precedence is used for operator precedence. This is used to avoid
+// unnecessary parentheses when printing expressions in the LLVM style.
+type precedence int
+
+// The precedence values, in order from high to low.
+const (
+	precPrimary precedence = iota
+	precPostfix
+	precUnary
+	precCast
+	precPtrMem
+	precMul
+	precAdd
+	precShift
+	precSpaceship
+	precRel
+	precEqual
+	precAnd
+	precXor
+	precOr
+	precLogicalAnd
+	precLogicalOr
+	precCond
+	precAssign
+	precComma
+	precDefault
+)
+
+// hasPrec matches the AST nodes that have a prec method that returns
+// the node's precedence.
+type hasPrec interface {
+	prec() precedence
+}
+
 // Name is an unqualified name.
 type Name struct {
 	Name string
@@ -158,6 +251,10 @@ func (n *Name) GoString() string {
 
 func (n *Name) goString(indent int, field string) string {
 	return fmt.Sprintf("%*s%s%s", indent, "", field, n.Name)
+}
+
+func (n *Name) prec() precedence {
+	return precPrimary
 }
 
 // Typed is a typed name.
@@ -287,6 +384,10 @@ func (q *Qualified) goString(indent int, field string) string {
 		q.Name.goString(indent+2, "Name: "))
 }
 
+func (q *Qualified) prec() precedence {
+	return precPrimary
+}
+
 // Template is a template with arguments.
 type Template struct {
 	Name AST
@@ -311,23 +412,18 @@ func (t *Template) print(ps *printState) {
 		ps.writeByte(' ')
 	}
 
+	scopes := ps.scopes
+	ps.scopes = 0
+
 	ps.writeByte('<')
-	first := true
-	for _, a := range t.Args {
-		if ps.isEmpty(a) {
-			continue
-		}
-		if !first {
-			ps.writeString(", ")
-		}
-		ps.print(a)
-		first = false
-	}
-	if ps.last == '>' {
+	ps.printList(t.Args, ps.isEmpty)
+	if ps.last == '>' && !ps.llvmStyle {
 		// Avoid syntactic ambiguity in old versions of C++.
 		ps.writeByte(' ')
 	}
 	ps.writeByte('>')
+
+	ps.scopes = scopes
 }
 
 func (t *Template) Traverse(fn func(AST) bool) {
@@ -531,7 +627,7 @@ type Qualifier struct {
 func (q *Qualifier) print(ps *printState) {
 	ps.writeString(q.Name)
 	if len(q.Exprs) > 0 {
-		ps.writeByte('(')
+		ps.startScope('(')
 		first := true
 		for _, e := range q.Exprs {
 			if el, ok := e.(*ExprList); ok && len(el.Exprs) == 0 {
@@ -543,7 +639,7 @@ func (q *Qualifier) print(ps *printState) {
 			ps.print(e)
 			first = false
 		}
-		ps.writeByte(')')
+		ps.endScope(')')
 	}
 }
 
@@ -772,6 +868,10 @@ func (bt *BuiltinType) GoString() string {
 
 func (bt *BuiltinType) goString(indent int, field string) string {
 	return fmt.Sprintf("%*s%sBuiltinType: %s", indent, "", field, bt.Name)
+}
+
+func (bt *BuiltinType) prec() precedence {
+	return precPrimary
 }
 
 // printBase is common print code for types that are printed with a
@@ -1102,9 +1202,10 @@ func (at *ArrayType) printDimension(ps *printState) {
 			}
 			ps.printOneInner(nil)
 		} else {
-			ps.writeString(" (")
+			ps.writeByte(' ')
+			ps.startScope('(')
 			ps.printInner(false)
-			ps.writeByte(')')
+			ps.endScope(')')
 		}
 	}
 	ps.writeString(space)
@@ -1212,16 +1313,16 @@ func (ft *FunctionType) printArgs(ps *printState) {
 		if space && ps.last != ' ' {
 			ps.writeByte(' ')
 		}
-		ps.writeByte('(')
+		ps.startScope('(')
 	}
 
 	save := ps.printInner(true)
 
 	if paren {
-		ps.writeByte(')')
+		ps.endScope(')')
 	}
 
-	ps.writeByte('(')
+	ps.startScope('(')
 	if !ft.ForLocalName || ps.enclosingParams {
 		first := true
 		for _, a := range ft.Args {
@@ -1235,7 +1336,7 @@ func (ft *FunctionType) printArgs(ps *printState) {
 			first = false
 		}
 	}
-	ps.writeByte(')')
+	ps.endScope(')')
 
 	ps.inner = save
 	ps.printInner(false)
@@ -1356,6 +1457,10 @@ func (fp *FunctionParam) GoString() string {
 
 func (fp *FunctionParam) goString(indent int, field string) string {
 	return fmt.Sprintf("%*s%sFunctionParam: %d", indent, "", field, fp.Index)
+}
+
+func (fp *FunctionParam) prec() precedence {
+	return precPrimary
 }
 
 // PtrMem is a pointer-to-member expression.
@@ -1619,9 +1724,9 @@ func (dt *Decltype) print(ps *printState) {
 	if !ps.llvmStyle {
 		ps.writeString(" ")
 	}
-	ps.writeString("(")
+	ps.startScope('(')
 	ps.print(dt.Expr)
-	ps.writeByte(')')
+	ps.endScope(')')
 }
 
 func (dt *Decltype) Traverse(fn func(AST) bool) {
@@ -1656,7 +1761,8 @@ func (dt *Decltype) goString(indent int, field string) string {
 
 // Operator is an operator.
 type Operator struct {
-	Name string
+	Name       string
+	precedence precedence
 }
 
 func (op *Operator) print(ps *printState) {
@@ -1686,6 +1792,10 @@ func (op *Operator) GoString() string {
 
 func (op *Operator) goString(indent int, field string) string {
 	return fmt.Sprintf("%*s%sOperator: %s", indent, "", field, op.Name)
+}
+
+func (op *Operator) prec() precedence {
+	return op.precedence
 }
 
 // Constructor is a constructor.
@@ -2007,9 +2117,10 @@ type SizeofPack struct {
 
 func (sp *SizeofPack) print(ps *printState) {
 	if ps.llvmStyle {
-		ps.writeString("sizeof...(")
+		ps.writeString("sizeof...")
+		ps.startScope('(')
 		ps.print(sp.Pack)
-		ps.writeByte(')')
+		ps.endScope(')')
 	} else {
 		ps.writeString(fmt.Sprintf("%d", len(sp.Pack.Args)))
 	}
@@ -2258,14 +2369,15 @@ type TemplateTemplateParam struct {
 }
 
 func (ttp *TemplateTemplateParam) print(ps *printState) {
+	scopes := ps.scopes
+	ps.scopes = 0
+
 	ps.writeString("template<")
-	for i, param := range ttp.Params {
-		if i > 0 {
-			ps.writeString(", ")
-		}
-		ps.print(param)
-	}
+	ps.printList(ttp.Params, nil)
 	ps.writeString("> typename ")
+
+	ps.scopes = scopes
+
 	ps.print(ttp.Name)
 }
 
@@ -2431,6 +2543,10 @@ func (c *Cast) goString(indent int, field string) string {
 		c.To.goString(indent+2, "To: "))
 }
 
+func (c *Cast) prec() precedence {
+	return precCast
+}
+
 // The parenthesize function prints the string for val, wrapped in
 // parentheses if necessary.
 func parenthesize(ps *printState, val AST) {
@@ -2449,11 +2565,11 @@ func parenthesize(ps *printState, val AST) {
 		paren = true
 	}
 	if paren {
-		ps.writeByte('(')
+		ps.startScope('(')
 	}
 	ps.print(val)
 	if paren {
-		ps.writeByte(')')
+		ps.endScope(')')
 	}
 }
 
@@ -2526,7 +2642,27 @@ func (u *Unary) print(ps *printState) {
 	}
 
 	if u.Suffix {
-		parenthesize(ps, expr)
+		if ps.llvmStyle {
+			wantParens := true
+			opPrec := precUnary
+			if op != nil {
+				opPrec = op.precedence
+			}
+			if p, ok := expr.(hasPrec); ok {
+				if p.prec() < opPrec {
+					wantParens = false
+				}
+			}
+			if wantParens {
+				ps.startScope('(')
+			}
+			ps.print(expr)
+			if wantParens {
+				ps.endScope(')')
+			}
+		} else {
+			parenthesize(ps, expr)
+		}
 	}
 
 	if op != nil {
@@ -2535,9 +2671,9 @@ func (u *Unary) print(ps *printState) {
 			ps.writeByte(' ')
 		}
 	} else if c, ok := u.Op.(*Cast); ok {
-		ps.writeByte('(')
+		ps.startScope('(')
 		ps.print(c.To)
-		ps.writeByte(')')
+		ps.endScope(')')
 	} else {
 		ps.print(u.Op)
 	}
@@ -2549,21 +2685,49 @@ func (u *Unary) print(ps *printState) {
 			ps.print(expr)
 		} else if u.SizeofType {
 			// Always use parentheses for sizeof argument.
-			ps.writeByte('(')
+			ps.startScope('(')
 			ps.print(expr)
-			ps.writeByte(')')
+			ps.endScope(')')
 		} else if op != nil && op.Name == "__alignof__" {
 			// Always use parentheses for __alignof__ argument.
-			ps.writeByte('(')
+			ps.startScope('(')
 			ps.print(expr)
-			ps.writeByte(')')
+			ps.endScope(')')
 		} else if ps.llvmStyle {
-			if op == nil || (op.Name != `operator"" ` && !isDelete) {
-				ps.writeByte('(')
+			var wantParens bool
+			switch {
+			case op == nil:
+				wantParens = true
+			case op.Name == `operator"" `:
+				wantParens = false
+			case op.Name == "&":
+				wantParens = false
+			case isDelete:
+				wantParens = false
+			case op.Name == "alignof ":
+				wantParens = true
+			case op.Name == "sizeof ":
+				wantParens = true
+			case op.Name == "typeid ":
+				wantParens = true
+			default:
+				wantParens = true
+				opPrec := precUnary
+				if op != nil {
+					opPrec = op.precedence
+				}
+				if p, ok := expr.(hasPrec); ok {
+					if p.prec() < opPrec {
+						wantParens = false
+					}
+				}
+			}
+			if wantParens {
+				ps.startScope('(')
 			}
 			ps.print(expr)
-			if op == nil || (op.Name != `operator"" ` && !isDelete) {
-				ps.writeByte(')')
+			if wantParens {
+				ps.endScope(')')
 			}
 		} else {
 			parenthesize(ps, expr)
@@ -2617,6 +2781,13 @@ func (u *Unary) goString(indent int, field string) string {
 		u.Expr.goString(indent+2, "Expr: "))
 }
 
+func (u *Unary) prec() precedence {
+	if p, ok := u.Op.(hasPrec); ok {
+		return p.prec()
+	}
+	return precDefault
+}
+
 // isDesignatedInitializer reports whether x is a designated
 // initializer.
 func isDesignatedInitializer(x AST) bool {
@@ -2654,11 +2825,19 @@ func (b *Binary) print(ps *printState) {
 
 	if op != nil && strings.Contains(op.Name, "cast") {
 		ps.writeString(op.Name)
+
+		scopes := ps.scopes
+		ps.scopes = 0
+
 		ps.writeByte('<')
 		ps.print(b.Left)
-		ps.writeString(">(")
+		ps.writeString(">")
+
+		ps.scopes = scopes
+
+		ps.startScope('(')
 		ps.print(b.Right)
-		ps.writeByte(')')
+		ps.endScope(')')
 		return
 	}
 
@@ -2691,22 +2870,21 @@ func (b *Binary) print(ps *printState) {
 	// Use an extra set of parentheses around an expression that
 	// uses the greater-than operator, so that it does not get
 	// confused with the '>' that ends template parameters.
-	if op != nil && op.Name == ">" {
-		ps.writeByte('(')
+	needsOuterParen := op != nil && (op.Name == ">" || op.Name == ">>")
+	if ps.llvmStyle && ps.scopes > 0 {
+		needsOuterParen = false
+	}
+	if needsOuterParen {
+		ps.startScope('(')
 	}
 
 	left := b.Left
 
 	skipParens := false
-	skipBothParens := false
 	addSpaces := ps.llvmStyle
 	if ps.llvmStyle && op != nil {
 		switch op.Name {
-		case ".", "->":
-			skipBothParens = true
-			addSpaces = false
-		case "->*":
-			skipParens = true
+		case ".", "->", "->*":
 			addSpaces = false
 		}
 	}
@@ -2730,12 +2908,26 @@ func (b *Binary) print(ps *printState) {
 		}
 	}
 
-	if skipParens || skipBothParens {
+	if skipParens {
 		ps.print(left)
 	} else if ps.llvmStyle {
-		ps.writeByte('(')
+		prec := precPrimary
+		if p, ok := left.(hasPrec); ok {
+			prec = p.prec()
+		}
+		needsParen := false
+		if prec > b.prec() {
+			needsParen = true
+		}
+		if needsParen {
+			ps.startScope('(')
+		}
+
 		ps.print(left)
-		ps.writeByte(')')
+
+		if needsParen {
+			ps.endScope(')')
+		}
 	} else {
 		parenthesize(ps, left)
 	}
@@ -2749,7 +2941,7 @@ func (b *Binary) print(ps *printState) {
 
 	if op != nil {
 		if op.Name != "()" {
-			if addSpaces {
+			if addSpaces && op.Name != "," {
 				ps.writeByte(' ')
 			}
 			ps.writeString(op.Name)
@@ -2761,18 +2953,30 @@ func (b *Binary) print(ps *printState) {
 		ps.print(b.Op)
 	}
 
-	if skipBothParens {
+	if ps.llvmStyle {
+		prec := precPrimary
+		if p, ok := b.Right.(hasPrec); ok {
+			prec = p.prec()
+		}
+		needsParen := false
+		if prec >= b.prec() {
+			needsParen = true
+		}
+		if needsParen {
+			ps.startScope('(')
+		}
+
 		ps.print(b.Right)
-	} else if ps.llvmStyle {
-		ps.writeByte('(')
-		ps.print(b.Right)
-		ps.writeByte(')')
+
+		if needsParen {
+			ps.endScope(')')
+		}
 	} else {
 		parenthesize(ps, b.Right)
 	}
 
-	if op != nil && op.Name == ">" {
-		ps.writeByte(')')
+	if needsOuterParen {
+		ps.endScope(')')
 	}
 }
 
@@ -2821,6 +3025,13 @@ func (b *Binary) goString(indent int, field string) string {
 		b.Right.goString(indent+2, "Right: "))
 }
 
+func (b *Binary) prec() precedence {
+	if p, ok := b.Op.(hasPrec); ok {
+		return p.prec()
+	}
+	return precDefault
+}
+
 // Trinary is the ?: trinary operation in an expression.
 type Trinary struct {
 	Op     AST
@@ -2852,15 +3063,71 @@ func (t *Trinary) print(ps *printState) {
 		return
 	}
 
-	parenthesize(ps, t.First)
+	if ps.llvmStyle {
+		wantParens := true
+		opPrec := precPrimary
+		if op, ok := t.Op.(*Operator); ok {
+			opPrec = op.precedence
+		}
+		if p, ok := t.First.(hasPrec); ok {
+			if p.prec() < opPrec {
+				wantParens = false
+			}
+		}
+		if wantParens {
+			ps.startScope('(')
+		}
+		ps.print(t.First)
+		if wantParens {
+			ps.endScope(')')
+		}
+	} else {
+		parenthesize(ps, t.First)
+	}
+
 	if ps.llvmStyle {
 		ps.writeString(" ? ")
 	} else {
 		ps.writeByte('?')
 	}
-	parenthesize(ps, t.Second)
+
+	if ps.llvmStyle {
+		wantParens := true
+		if p, ok := t.Second.(hasPrec); ok {
+			if p.prec() < precDefault {
+				wantParens = false
+			}
+		}
+		if wantParens {
+			ps.startScope('(')
+		}
+		ps.print(t.Second)
+		if wantParens {
+			ps.endScope(')')
+		}
+	} else {
+		parenthesize(ps, t.Second)
+	}
+
 	ps.writeString(" : ")
-	parenthesize(ps, t.Third)
+
+	if ps.llvmStyle {
+		wantParens := true
+		if p, ok := t.Third.(hasPrec); ok {
+			if p.prec() < precAssign {
+				wantParens = false
+			}
+		}
+		if wantParens {
+			ps.startScope('(')
+		}
+		ps.print(t.Third)
+		if wantParens {
+			ps.endScope(')')
+		}
+	} else {
+		parenthesize(ps, t.Third)
+	}
 }
 
 func (t *Trinary) Traverse(fn func(AST) bool) {
@@ -2938,33 +3205,49 @@ func (f *Fold) print(ps *printState) {
 		}
 	}
 	foldParenthesize := func(a AST) {
-		if _, ok := a.(*ArgumentPack); ok || !ps.llvmStyle {
-			parenthesize(ps, a)
-		} else {
+		if ps.llvmStyle {
+			prec := precDefault
+			if p, ok := a.(hasPrec); ok {
+				prec = p.prec()
+			}
+			needsParen := false
+			if prec > precCast {
+				needsParen = true
+			}
+			if needsParen {
+				ps.startScope('(')
+			}
 			ps.print(a)
+			if needsParen {
+				ps.endScope(')')
+			}
+		} else {
+			parenthesize(ps, a)
 		}
 	}
 
 	if f.Arg2 == nil {
 		if f.Left {
-			ps.writeString("(...")
+			ps.startScope('(')
+			ps.writeString("...")
 			printOp()
 			foldParenthesize(f.Arg1)
-			ps.writeString(")")
+			ps.endScope(')')
 		} else {
-			ps.writeString("(")
+			ps.startScope('(')
 			foldParenthesize(f.Arg1)
 			printOp()
-			ps.writeString("...)")
+			ps.writeString("...")
+			ps.endScope(')')
 		}
 	} else {
-		ps.writeString("(")
+		ps.startScope('(')
 		foldParenthesize(f.Arg1)
 		printOp()
 		ps.writeString("...")
 		printOp()
 		foldParenthesize(f.Arg2)
-		ps.writeString(")")
+		ps.endScope(')')
 	}
 }
 
@@ -3109,11 +3392,11 @@ type PtrMemCast struct {
 }
 
 func (pmc *PtrMemCast) print(ps *printState) {
-	ps.writeString("(")
+	ps.startScope('(')
 	ps.print(pmc.Type)
 	ps.writeString(")(")
 	ps.print(pmc.Expr)
-	ps.writeString(")")
+	ps.endScope(')')
 }
 
 func (pmc *PtrMemCast) Traverse(fn func(AST) bool) {
@@ -3310,7 +3593,7 @@ func (l *Literal) print(ps *printState) {
 				ps.writeString("true")
 				return
 			}
-		} else if b.Name == "decltype(nullptr)" && l.Val == "" {
+		} else if b.Name == "decltype(nullptr)" && (l.Val == "" || l.Val == "0") {
 			if ps.llvmStyle {
 				ps.writeString("nullptr")
 			} else {
@@ -3322,9 +3605,9 @@ func (l *Literal) print(ps *printState) {
 		}
 	}
 
-	ps.writeByte('(')
+	ps.startScope('(')
 	ps.print(l.Type)
-	ps.writeByte(')')
+	ps.endScope(')')
 
 	if isFloat {
 		ps.writeByte('[')
@@ -3371,6 +3654,10 @@ func (l *Literal) goString(indent int, field string) string {
 	return fmt.Sprintf("%*s%sLiteral:%s\n%s\n%*sVal: %s", indent, "", field,
 		neg, l.Type.goString(indent+2, "Type: "),
 		indent+2, "", l.Val)
+}
+
+func (l *Literal) prec() precedence {
+	return precPrimary
 }
 
 // StringLiteral is a string literal.
@@ -3464,12 +3751,7 @@ type ExprList struct {
 }
 
 func (el *ExprList) print(ps *printState) {
-	for i, e := range el.Exprs {
-		if i > 0 {
-			ps.writeString(", ")
-		}
-		ps.print(e)
-	}
+	ps.printList(el.Exprs, nil)
 }
 
 func (el *ExprList) Traverse(fn func(AST) bool) {
@@ -3519,6 +3801,10 @@ func (el *ExprList) goString(indent int, field string) string {
 		s += e.goString(indent+2, fmt.Sprintf("%d: ", i))
 	}
 	return s
+}
+
+func (el *ExprList) prec() precedence {
+	return precComma
 }
 
 // InitializerList is an initializer list: an optional type with a
@@ -3654,23 +3940,18 @@ func (cl *Closure) print(ps *printState) {
 
 func (cl *Closure) printTypes(ps *printState) {
 	if len(cl.TemplateArgs) > 0 {
+		scopes := ps.scopes
+		ps.scopes = 0
+
 		ps.writeString("<")
-		for i, a := range cl.TemplateArgs {
-			if i > 0 {
-				ps.writeString(", ")
-			}
-			ps.print(a)
-		}
+		ps.printList(cl.TemplateArgs, nil)
 		ps.writeString(">")
+
+		ps.scopes = scopes
 	}
-	ps.writeString("(")
-	for i, t := range cl.Types {
-		if i > 0 {
-			ps.writeString(", ")
-		}
-		ps.print(t)
-	}
-	ps.writeString(")")
+	ps.startScope('(')
+	ps.printList(cl.Types, nil)
+	ps.endScope(')')
 }
 
 func (cl *Closure) Traverse(fn func(AST) bool) {
@@ -3758,12 +4039,7 @@ type StructuredBindings struct {
 
 func (sb *StructuredBindings) print(ps *printState) {
 	ps.writeString("[")
-	for i, b := range sb.Bindings {
-		if i > 0 {
-			ps.writeString(", ")
-		}
-		b.print(ps)
-	}
+	ps.printList(sb.Bindings, nil)
 	ps.writeString("]")
 }
 
@@ -3859,9 +4135,10 @@ type Clone struct {
 func (c *Clone) print(ps *printState) {
 	ps.print(c.Base)
 	if ps.llvmStyle {
-		ps.writeString(" (")
+		ps.writeByte(' ')
+		ps.startScope('(')
 		ps.writeString(c.Suffix)
-		ps.writeByte(')')
+		ps.endScope(')')
 	} else {
 		ps.writeString(fmt.Sprintf(" [clone %s]", c.Suffix))
 	}
@@ -4011,14 +4288,7 @@ type EnableIf struct {
 func (ei *EnableIf) print(ps *printState) {
 	ps.print(ei.Type)
 	ps.writeString(" [enable_if:")
-	first := true
-	for _, a := range ei.Args {
-		if !first {
-			ps.writeString(", ")
-		}
-		ps.print(a)
-		first = false
-	}
+	ps.printList(ei.Args, nil)
 	ps.writeString("]")
 }
 
