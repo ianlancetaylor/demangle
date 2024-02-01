@@ -576,13 +576,15 @@ func (st *state) name() AST {
 	if len(st.str) < 1 {
 		st.fail("expected name")
 	}
+
+	var module AST
 	switch st.str[0] {
 	case 'N':
 		return st.nestedName()
 	case 'Z':
 		return st.localName()
 	case 'U':
-		a, isCast := st.unqualifiedName()
+		a, isCast := st.unqualifiedName(nil)
 		if isCast {
 			st.setTemplate(a, nil)
 		}
@@ -597,10 +599,14 @@ func (st *state) name() AST {
 		subst := false
 		if st.str[1] == 't' {
 			st.advance(2)
-			a, isCast = st.unqualifiedName()
+			a, isCast = st.unqualifiedName(nil)
 			a = &Qualified{Scope: &Name{Name: "std"}, Name: a, LocalName: false}
 		} else {
 			a = st.substitution(false)
+			if mn, ok := a.(*ModuleName); ok {
+				module = mn
+				break
+			}
 			subst = true
 		}
 		if len(st.str) > 0 && st.str[0] == 'I' {
@@ -625,25 +631,24 @@ func (st *state) name() AST {
 			st.setTemplate(a, nil)
 		}
 		return a
-
-	default:
-		a, isCast := st.unqualifiedName()
-		if len(st.str) > 0 && st.str[0] == 'I' {
-			st.subs.add(a)
-			args := st.templateArgs()
-			tmpl := &Template{Name: a, Args: args}
-			if isCast {
-				st.setTemplate(a, tmpl)
-				st.clearTemplateArgs(args)
-				isCast = false
-			}
-			a = tmpl
-		}
-		if isCast {
-			st.setTemplate(a, nil)
-		}
-		return a
 	}
+
+	a, isCast := st.unqualifiedName(module)
+	if len(st.str) > 0 && st.str[0] == 'I' {
+		st.subs.add(a)
+		args := st.templateArgs()
+		tmpl := &Template{Name: a, Args: args}
+		if isCast {
+			st.setTemplate(a, tmpl)
+			st.clearTemplateArgs(args)
+			isCast = false
+		}
+		a = tmpl
+	}
+	if isCast {
+		st.setTemplate(a, nil)
+	}
+	return a
 }
 
 // nestedName parses:
@@ -686,6 +691,8 @@ func (st *state) prefix() AST {
 	// The last name seen, for a constructor/destructor.
 	var last AST
 
+	var module AST
+
 	getLast := func(a AST) AST {
 		for {
 			if t, ok := a.(*Template); ok {
@@ -708,9 +715,10 @@ func (st *state) prefix() AST {
 		var next AST
 
 		c := st.str[0]
-		if isDigit(c) || isLower(c) || c == 'U' || c == 'L' || (c == 'D' && len(st.str) > 1 && st.str[1] == 'C') {
-			un, isUnCast := st.unqualifiedName()
+		if isDigit(c) || isLower(c) || c == 'U' || c == 'L' || c == 'W' || (c == 'D' && len(st.str) > 1 && st.str[1] == 'C') {
+			un, isUnCast := st.unqualifiedName(module)
 			next = un
+			module = nil
 			if isUnCast {
 				if tn, ok := un.(*TaggedName); ok {
 					un = tn.Name
@@ -762,6 +770,10 @@ func (st *state) prefix() AST {
 				}
 			case 'S':
 				next = st.substitution(true)
+				if mn, ok := next.(*ModuleName); ok {
+					module = mn
+					next = nil
+				}
 			case 'I':
 				if a == nil {
 					st.fail("unexpected template arguments")
@@ -828,6 +840,11 @@ func (st *state) prefix() AST {
 				st.fail("unrecognized letter in prefix")
 			}
 		}
+
+		if next == nil {
+			continue
+		}
+
 		last = next
 		if a == nil {
 			a = next
@@ -849,10 +866,13 @@ func (st *state) prefix() AST {
 //	                   ::= <local-source-name>
 //
 //	 <local-source-name>	::= L <source-name> <discriminator>
-func (st *state) unqualifiedName() (r AST, isCast bool) {
+func (st *state) unqualifiedName(module AST) (r AST, isCast bool) {
 	if len(st.str) < 1 {
 		st.fail("expected unqualified name")
 	}
+
+	module = st.moduleName(module)
+
 	var a AST
 	isCast = false
 	c := st.str[0]
@@ -911,6 +931,10 @@ func (st *state) unqualifiedName() (r AST, isCast bool) {
 		}
 	}
 
+	if module != nil {
+		a = &ModuleEntity{Module: module, Name: a}
+	}
+
 	if len(st.str) > 0 && st.str[0] == 'B' {
 		a = st.taggedName(a)
 	}
@@ -946,6 +970,35 @@ func (st *state) sourceName() AST {
 
 	n := &Name{Name: id}
 	return n
+}
+
+// moduleName parses:
+//
+//	<module-name> ::= <module-subname>
+//	 	      ::= <module-name> <module-subname>
+//		      ::= <substitution>  # passed in by caller
+//	<module-subname> ::= W <source-name>
+//			 ::= W P <source-name>
+//
+// The module name is optional. If it is not present, this returns the parent.
+func (st *state) moduleName(parent AST) AST {
+	ret := parent
+	for len(st.str) > 0 && st.str[0] == 'W' {
+		st.advance(1)
+		isPartition := false
+		if len(st.str) > 0 && st.str[0] == 'P' {
+			st.advance(1)
+			isPartition = true
+		}
+		name := st.sourceName()
+		ret = &ModuleName{
+			Parent:      ret,
+			Name:        name,
+			IsPartition: isPartition,
+		}
+		st.subs.add(ret)
+	}
+	return ret
 }
 
 // number parses:
@@ -1237,6 +1290,7 @@ func (st *state) javaResource() AST {
 //	               ::= Gr <resource name>
 //	               ::= GTt <encoding>
 //	               ::= GTn <encoding>
+//	               ::= GI <module name>
 func (st *state) specialName() AST {
 	if st.str[0] == 'T' {
 		st.advance(1)
@@ -1342,6 +1396,12 @@ func (st *state) specialName() AST {
 			}
 		case 'r':
 			return st.javaResource()
+		case 'I':
+			module := st.moduleName(nil)
+			if module == nil {
+				st.fail("expected module after GI")
+			}
+			return &Special{Prefix: "initializer for module ", Val: module}
 		default:
 			st.fail("unrecognized special G name code")
 			panic("not reached")
@@ -1476,7 +1536,7 @@ func (st *state) demangleType(isCast bool) AST {
 		ret = st.sourceName()
 	case 'F':
 		ret = st.functionType()
-	case 'N', 'Z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+	case 'N', 'W', 'Z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		ret = st.name()
 	case 'A':
 		ret = st.arrayType(isCast)
@@ -1520,6 +1580,10 @@ func (st *state) demangleType(isCast bool) AST {
 		}
 		if isDigit(c2) || c2 == '_' || isUpper(c2) {
 			ret = st.substitution(false)
+			if _, ok := ret.(*ModuleName); ok {
+				ret, _ = st.unqualifiedName(ret)
+				st.subs.add(ret)
+			}
 			if len(st.str) == 0 || st.str[0] != 'I' {
 				addSubst = false
 			} else {
@@ -2207,9 +2271,9 @@ func (st *state) templateArgs() []AST {
 //	<template-arg> ::= <type>
 //	               ::= X <expression> E
 //	               ::= <expr-primary>
-//                     ::= J <template-arg>* E
-//                     ::= LZ <encoding> E
-//                     ::= <template-param-decl> <template-arg>
+//	               ::= J <template-arg>* E
+//	               ::= LZ <encoding> E
+//	               ::= <template-param-decl> <template-arg>
 func (st *state) templateArg(prev []AST) AST {
 	if len(st.str) == 0 {
 		st.fail("missing template argument")
@@ -2426,7 +2490,7 @@ func (st *state) expression() AST {
 			// Skip operator function ID.
 			st.advance(2)
 		}
-		n, _ := st.unqualifiedName()
+		n, _ := st.unqualifiedName(nil)
 		if len(st.str) > 0 && st.str[0] == 'I' {
 			args := st.templateArgs()
 			n = &Template{Name: n, Args: args}
@@ -2527,7 +2591,7 @@ func (st *state) expression() AST {
 				right = st.expression()
 				return &Fold{Left: code[1] == 'l', Op: left, Arg1: right, Arg2: nil}
 			} else if code == "di" {
-				left, _ = st.unqualifiedName()
+				left, _ = st.unqualifiedName(nil)
 			} else {
 				left = st.expression()
 			}

@@ -4511,6 +4511,124 @@ func (ei *EnableIf) goString(indent int, field string) string {
 		ei.Type.goString(indent+2, "Type: "), args)
 }
 
+// ModuleName is a C++20 module.
+type ModuleName struct {
+	Parent      AST
+	Name        AST
+	IsPartition bool
+}
+
+func (mn *ModuleName) print(ps *printState) {
+	if mn.Parent != nil {
+		ps.print(mn.Parent)
+	}
+	if mn.IsPartition {
+		ps.writeByte(':')
+	} else if mn.Parent != nil {
+		ps.writeByte('.')
+	}
+	ps.print(mn.Name)
+}
+
+func (mn *ModuleName) Traverse(fn func(AST) bool) {
+	if fn(mn) {
+		mn.Parent.Traverse(fn)
+		mn.Name.Traverse(fn)
+	}
+}
+
+func (mn *ModuleName) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(mn) {
+		return nil
+	}
+	var parent AST
+	if mn.Parent != nil {
+		parent = mn.Parent.Copy(fn, skip)
+	}
+	name := mn.Name.Copy(fn, skip)
+	if parent == nil && name == nil {
+		return fn(mn)
+	}
+	if parent == nil {
+		parent = mn.Parent
+	}
+	if name == nil {
+		name = mn.Name
+	}
+	mn = &ModuleName{Parent: parent, Name: name, IsPartition: mn.IsPartition}
+	if r := fn(mn); r != nil {
+		return r
+	}
+	return mn
+}
+
+func (mn *ModuleName) GoString() string {
+	return mn.goString(0, "")
+}
+
+func (mn *ModuleName) goString(indent int, field string) string {
+	var parent string
+	if mn.Parent == nil {
+		parent = fmt.Sprintf("%*sParent: nil", indent+2, "")
+	} else {
+		parent = mn.Parent.goString(indent+2, "Parent: ")
+	}
+	return fmt.Sprintf("%*s%sModuleName: IsPartition: %t\n%s\n%s", indent, "", field,
+		mn.IsPartition, parent,
+		mn.Name.goString(indent+2, "Name: "))
+}
+
+// ModuleEntity is a name inside a module.
+type ModuleEntity struct {
+	Module AST
+	Name   AST
+}
+
+func (me *ModuleEntity) print(ps *printState) {
+	ps.print(me.Name)
+	ps.writeByte('@')
+	ps.print(me.Module)
+}
+
+func (me *ModuleEntity) Traverse(fn func(AST) bool) {
+	if fn(me) {
+		me.Module.Traverse(fn)
+		me.Name.Traverse(fn)
+	}
+}
+
+func (me *ModuleEntity) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(me) {
+		return nil
+	}
+	module := me.Module.Copy(fn, skip)
+	name := me.Name.Copy(fn, skip)
+	if module == nil && name == nil {
+		return fn(me)
+	}
+	if module == nil {
+		module = me.Module
+	}
+	if name == nil {
+		name = me.Name
+	}
+	me = &ModuleEntity{Module: module, Name: name}
+	if r := fn(me); r != nil {
+		return r
+	}
+	return me
+}
+
+func (me *ModuleEntity) GoString() string {
+	return me.goString(0, "")
+}
+
+func (me *ModuleEntity) goString(indent int, field string) string {
+	return fmt.Sprintf("%*s%sModuleEntity:\n%s\n%s", indent, "", field,
+		me.Module.goString(indent+2, "Module: "),
+		me.Name.goString(indent+2, "Name: "))
+}
+
 // Print the inner types.
 func (ps *printState) printInner(prefixOnly bool) []AST {
 	var save []AST
