@@ -2534,10 +2534,14 @@ func (st *state) expression() AST {
 			if code == "cl" || code == "cp" {
 				right = st.exprList('E')
 			} else if code == "dt" || code == "pt" {
-				right = st.unresolvedName()
-				if len(st.str) > 0 && st.str[0] == 'I' {
-					args := st.templateArgs()
-					right = &Template{Name: right, Args: args}
+				if len(st.str) > 0 && st.str[0] == 'L' {
+					right = st.exprPrimary()
+				} else {
+					right = st.unresolvedName()
+					if len(st.str) > 0 && st.str[0] == 'I' {
+						args := st.templateArgs()
+						right = &Template{Name: right, Args: args}
+					}
 				}
 			} else {
 				right = st.expression()
