@@ -812,7 +812,7 @@ func (st *state) prefix() AST {
 				}
 				var args []AST
 				for len(st.str) == 0 || st.str[0] != 'E' {
-					arg := st.templateArg()
+					arg := st.templateArg(nil)
 					args = append(args, arg)
 				}
 				st.advance(1)
@@ -1259,7 +1259,7 @@ func (st *state) specialName() AST {
 			t := st.demangleType(false)
 			return &Special{Prefix: "typeinfo name for ", Val: t}
 		case 'A':
-			t := st.templateArg()
+			t := st.templateArg(nil)
 			return &Special{Prefix: "template parameter object for ", Val: t}
 		case 'h':
 			st.callOffset('h')
@@ -2195,7 +2195,7 @@ func (st *state) templateArgs() []AST {
 
 	var ret []AST
 	for len(st.str) == 0 || st.str[0] != 'E' {
-		arg := st.templateArg()
+		arg := st.templateArg(ret)
 		ret = append(ret, arg)
 	}
 	st.advance(1)
@@ -2210,7 +2210,7 @@ func (st *state) templateArgs() []AST {
 //                     ::= J <template-arg>* E
 //                     ::= LZ <encoding> E
 //                     ::= <template-param-decl> <template-arg>
-func (st *state) templateArg() AST {
+func (st *state) templateArg(prev []AST) AST {
 	if len(st.str) == 0 {
 		st.fail("missing template argument")
 	}
@@ -2239,11 +2239,21 @@ func (st *state) templateArg() AST {
 		switch arg {
 		case 'y', 'n', 't', 'p', 'k':
 			off := st.off
+
+			// Apparently template references in the
+			// template parameter refer to previous
+			// arguments in the same template.
+			template := &Template{Args: prev}
+			st.templates = append(st.templates, template)
+
 			param, _ := st.templateParamDecl()
+
+			st.templates = st.templates[:len(st.templates)-1]
+
 			if param == nil {
 				st.failEarlier("expected template parameter as template argument", st.off-off)
 			}
-			arg := st.templateArg()
+			arg := st.templateArg(nil)
 			return &TemplateParamQualifiedArg{Param: param, Arg: arg}
 		}
 		return st.demangleType(false)
@@ -2364,7 +2374,7 @@ func (st *state) expression() AST {
 		st.advance(2)
 		var args []AST
 		for len(st.str) == 0 || st.str[0] != 'E' {
-			arg := st.templateArg()
+			arg := st.templateArg(nil)
 			args = append(args, arg)
 		}
 		st.advance(1)
@@ -2472,7 +2482,7 @@ func (st *state) expression() AST {
 				st.advance(1)
 				break
 			}
-			arg := st.templateArg()
+			arg := st.templateArg(nil)
 			args = append(args, arg)
 		}
 		return &Binary{
