@@ -556,6 +556,61 @@ func (la *LambdaAuto) goString(indent int, field string) string {
 	return fmt.Sprintf("%*s%sLambdaAuto: Index %d", indent, "", field, la.Index)
 }
 
+// TemplateParamQualifiedArg is used when the mangled name includes
+// both the template parameter declaration and the template argument.
+// See https://github.com/itanium-cxx-abi/cxx-abi/issues/47.
+type TemplateParamQualifiedArg struct {
+	Param AST
+	Arg   AST
+}
+
+func (tpqa *TemplateParamQualifiedArg) print(ps *printState) {
+	// We only demangle the actual template argument.
+	// That is what the LLVM demangler does.
+	// The parameter disambiguates the argument,
+	// but is hopefully not required by a human reader.
+	ps.print(tpqa.Arg)
+}
+
+func (tpqa *TemplateParamQualifiedArg) Traverse(fn func(AST) bool) {
+	if fn(tpqa) {
+		tpqa.Param.Traverse(fn)
+		tpqa.Arg.Traverse(fn)
+	}
+}
+
+func (tpqa *TemplateParamQualifiedArg) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(tpqa) {
+		return nil
+	}
+	param := tpqa.Param.Copy(fn, skip)
+	arg := tpqa.Arg.Copy(fn, skip)
+	if param == nil && arg == nil {
+		return fn(tpqa)
+	}
+	if param == nil {
+		param = tpqa.Param
+	}
+	if arg == nil {
+		arg = tpqa.Arg
+	}
+	tpqa = &TemplateParamQualifiedArg{Param: param, Arg: arg}
+	if r := fn(tpqa); r != nil {
+		return r
+	}
+	return tpqa
+}
+
+func (tpqa *TemplateParamQualifiedArg) GoString() string {
+	return tpqa.goString(0, "")
+}
+
+func (tpqa *TemplateParamQualifiedArg) goString(indent int, field string) string {
+	return fmt.Sprintf("%*s%sTemplateParamQualifiedArg:\n%s\n%s", indent, "", field,
+		tpqa.Param.goString(indent+2, "Param: "),
+		tpqa.Arg.goString(indent+2, "Arg: "))
+}
+
 // Qualifiers is an ordered list of type qualifiers.
 type Qualifiers struct {
 	Qualifiers []AST
@@ -2490,6 +2545,66 @@ func (ttp *TemplateTemplateParam) goString(indent int, field string) string {
 	return fmt.Sprintf("%*s%sTemplateTemplateParam:\n%s\n%s", indent, "", field,
 		ttp.Name.goString(indent+2, "Name: "),
 		params.String())
+}
+
+// ConstrainedTypeTemplateParam is a constrained template type
+// parameter declaration.
+type ConstrainedTypeTemplateParam struct {
+	Name       AST
+	Constraint AST
+}
+
+func (cttp *ConstrainedTypeTemplateParam) print(ps *printState) {
+	ps.inner = append(ps.inner, cttp)
+	ps.print(cttp.Constraint)
+	if len(ps.inner) > 0 {
+		ps.writeByte(' ')
+		ps.print(cttp.Name)
+		ps.inner = ps.inner[:len(ps.inner)-1]
+	}
+}
+
+func (cttp *ConstrainedTypeTemplateParam) printInner(ps *printState) {
+	ps.print(cttp.Name)
+}
+
+func (cttp *ConstrainedTypeTemplateParam) Traverse(fn func(AST) bool) {
+	if fn(cttp) {
+		cttp.Name.Traverse(fn)
+		cttp.Constraint.Traverse(fn)
+	}
+}
+
+func (cttp *ConstrainedTypeTemplateParam) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(cttp) {
+		return nil
+	}
+	name := cttp.Name.Copy(fn, skip)
+	constraint := cttp.Constraint.Copy(fn, skip)
+	if name == nil && constraint == nil {
+		return fn(cttp)
+	}
+	if name == nil {
+		name = cttp.Name
+	}
+	if constraint == nil {
+		constraint = cttp.Constraint
+	}
+	cttp = &ConstrainedTypeTemplateParam{Name: name, Constraint: constraint}
+	if r := fn(cttp); r != nil {
+		return r
+	}
+	return cttp
+}
+
+func (cttp *ConstrainedTypeTemplateParam) GoString() string {
+	return cttp.goString(0, "")
+}
+
+func (cttp *ConstrainedTypeTemplateParam) goString(indent int, field string) string {
+	return fmt.Sprintf("%*s%sConstrainedTypeTemplateParam\n%s\n%s", indent, "", field,
+		cttp.Name.goString(indent+2, "Name: "),
+		cttp.Constraint.goString(indent+2, "Constraint: "))
 }
 
 // TemplateParamPack is a template parameter pack that appears in a

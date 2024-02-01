@@ -2207,6 +2207,9 @@ func (st *state) templateArgs() []AST {
 //	<template-arg> ::= <type>
 //	               ::= X <expression> E
 //	               ::= <expr-primary>
+//                     ::= J <template-arg>* E
+//                     ::= LZ <encoding> E
+//                     ::= <template-param-decl> <template-arg>
 func (st *state) templateArg() AST {
 	if len(st.str) == 0 {
 		st.fail("missing template argument")
@@ -2227,6 +2230,23 @@ func (st *state) templateArg() AST {
 	case 'I', 'J':
 		args := st.templateArgs()
 		return &ArgumentPack{Args: args}
+
+	case 'T':
+		var arg byte
+		if len(st.str) > 1 {
+			arg = st.str[1]
+		}
+		switch arg {
+		case 'y', 'n', 't', 'p', 'k':
+			off := st.off
+			param, _ := st.templateParamDecl()
+			if param == nil {
+				st.failEarlier("expected template parameter as template argument", st.off-off)
+			}
+			arg := st.templateArg()
+			return &TemplateParamQualifiedArg{Param: param, Arg: arg}
+		}
+		return st.demangleType(false)
 
 	default:
 		return st.demangleType(false)
@@ -2892,6 +2912,15 @@ func (st *state) templateParamDecl() (AST, AST) {
 		name := mk("$T", &st.typeTemplateParamCount)
 		tp := &TypeTemplateParam{
 			Name: name,
+		}
+		return tp, name
+	case 'k':
+		st.advance(2)
+		constraint := st.name()
+		name := mk("$T", &st.typeTemplateParamCount)
+		tp := &ConstrainedTypeTemplateParam{
+			Name:       name,
+			Constraint: constraint,
 		}
 		return tp, name
 	case 'n':
