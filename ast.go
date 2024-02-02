@@ -5157,6 +5157,46 @@ func (nr *NestedRequirement) goString(indent int, field string) string {
 		nr.Constraint.goString(indent+2, ""))
 }
 
+// ExplicitObjectParameter represents a C++23 explicit object parameter.
+type ExplicitObjectParameter struct {
+	Base AST
+}
+
+func (eop *ExplicitObjectParameter) print(ps *printState) {
+	ps.writeString("this ")
+	ps.print(eop.Base)
+}
+
+func (eop *ExplicitObjectParameter) Traverse(fn func(AST) bool) {
+	if fn(eop) {
+		eop.Base.Traverse(fn)
+	}
+}
+
+func (eop *ExplicitObjectParameter) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(eop) {
+		return nil
+	}
+	base := eop.Base.Copy(fn, skip)
+	if base == nil {
+		return fn(eop)
+	}
+	eop = &ExplicitObjectParameter{Base: base}
+	if r := fn(eop); r != nil {
+		return r
+	}
+	return eop
+}
+
+func (eop *ExplicitObjectParameter) GoString() string {
+	return eop.goString(0, "")
+}
+
+func (eop *ExplicitObjectParameter) goString(indent int, field string) string {
+	return fmt.Sprintf("%*s%sExplicitObjectParameter:\n%s", indent, "", field,
+		eop.Base.goString(indent+2, ""))
+}
+
 // Print the inner types.
 func (ps *printState) printInner(prefixOnly bool) []AST {
 	var save []AST
