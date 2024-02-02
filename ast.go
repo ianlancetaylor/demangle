@@ -1155,6 +1155,51 @@ func (it *ImaginaryType) goString(indent int, field string) string {
 		it.Base.goString(indent+2, ""))
 }
 
+// SuffixType is an type with an arbitrary suffix.
+type SuffixType struct {
+	Base   AST
+	Suffix string
+}
+
+func (st *SuffixType) print(ps *printState) {
+	printBase(ps, st, st.Base)
+}
+
+func (st *SuffixType) printInner(ps *printState) {
+	ps.writeByte(' ')
+	ps.writeString(st.Suffix)
+}
+
+func (st *SuffixType) Traverse(fn func(AST) bool) {
+	if fn(st) {
+		st.Base.Traverse(fn)
+	}
+}
+
+func (st *SuffixType) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(st) {
+		return nil
+	}
+	base := st.Base.Copy(fn, skip)
+	if base == nil {
+		return fn(st)
+	}
+	st = &SuffixType{Base: base, Suffix: st.Suffix}
+	if r := fn(st); r != nil {
+		return r
+	}
+	return st
+}
+
+func (st *SuffixType) GoString() string {
+	return st.goString(0, "")
+}
+
+func (st *SuffixType) goString(indent int, field string) string {
+	return fmt.Sprintf("%*s%sSuffixType: %s\n%s", indent, "", field,
+		st.Suffix, st.Base.goString(indent+2, "Base: "))
+}
+
 // VendorQualifier is a type qualified by a vendor-specific qualifier.
 type VendorQualifier struct {
 	Qualifier AST
@@ -2466,8 +2511,9 @@ func (nttp *NonTypeTemplateParam) goString(indent int, field string) string {
 // TemplateTemplateParam is a template template parameter that appears
 // in a lambda with explicit template parameters.
 type TemplateTemplateParam struct {
-	Name   AST
-	Params []AST
+	Name       AST
+	Params     []AST
+	Constraint AST
 }
 
 func (ttp *TemplateTemplateParam) print(ps *printState) {
@@ -2481,6 +2527,11 @@ func (ttp *TemplateTemplateParam) print(ps *printState) {
 	ps.scopes = scopes
 
 	ps.print(ttp.Name)
+
+	if ttp.Constraint != nil {
+		ps.writeString(" requires ")
+		ps.print(ttp.Constraint)
+	}
 }
 
 func (ttp *TemplateTemplateParam) Traverse(fn func(AST) bool) {
@@ -2488,6 +2539,9 @@ func (ttp *TemplateTemplateParam) Traverse(fn func(AST) bool) {
 		ttp.Name.Traverse(fn)
 		for _, param := range ttp.Params {
 			param.Traverse(fn)
+		}
+		if ttp.Constraint != nil {
+			ttp.Constraint.Traverse(fn)
 		}
 	}
 }
@@ -2517,13 +2571,24 @@ func (ttp *TemplateTemplateParam) Copy(fn func(AST) AST, skip func(AST) bool) AS
 		}
 	}
 
+	var constraint AST
+	if ttp.Constraint != nil {
+		constraint = ttp.Constraint.Copy(fn, skip)
+		if constraint == nil {
+			constraint = ttp.Constraint
+		} else {
+			changed = true
+		}
+	}
+
 	if !changed {
 		return fn(ttp)
 	}
 
 	ttp = &TemplateTemplateParam{
-		Name:   name,
-		Params: params,
+		Name:       name,
+		Params:     params,
+		Constraint: constraint,
 	}
 	if r := fn(ttp); r != nil {
 		return r
@@ -2542,9 +2607,16 @@ func (ttp *TemplateTemplateParam) goString(indent int, field string) string {
 		params.WriteByte('\n')
 		params.WriteString(p.goString(indent+4, fmt.Sprintf("%d: ", i)))
 	}
-	return fmt.Sprintf("%*s%sTemplateTemplateParam:\n%s\n%s", indent, "", field,
+	var constraint string
+	if ttp.Constraint == nil {
+		constraint = fmt.Sprintf("%*sConstraint: nil", indent+2, "")
+	} else {
+		constraint = ttp.Constraint.goString(indent+2, "Constraint: ")
+	}
+	return fmt.Sprintf("%*s%sTemplateTemplateParam:\n%s\n%s\n%s", indent, "", field,
 		ttp.Name.goString(indent+2, "Name: "),
-		params.String())
+		params.String(),
+		constraint)
 }
 
 // ConstrainedTypeTemplateParam is a constrained template type
@@ -4079,9 +4151,11 @@ func (da *DefaultArg) goString(indent int, field string) string {
 
 // Closure is a closure, or lambda expression.
 type Closure struct {
-	TemplateArgs []AST
-	Types        []AST
-	Num          int
+	TemplateArgs           []AST
+	TemplateArgsConstraint AST
+	Types                  []AST
+	Num                    int
+	CallConstraint         AST
 }
 
 func (cl *Closure) print(ps *printState) {
@@ -4111,9 +4185,21 @@ func (cl *Closure) printTypes(ps *printState) {
 
 		ps.scopes = scopes
 	}
+
+	if cl.TemplateArgsConstraint != nil {
+		ps.writeString(" requires ")
+		ps.print(cl.TemplateArgsConstraint)
+		ps.writeByte(' ')
+	}
+
 	ps.startScope('(')
 	ps.printList(cl.Types, nil)
 	ps.endScope(')')
+
+	if cl.CallConstraint != nil {
+		ps.writeString(" requires ")
+		ps.print(cl.CallConstraint)
+	}
 }
 
 func (cl *Closure) Traverse(fn func(AST) bool) {
@@ -4121,8 +4207,14 @@ func (cl *Closure) Traverse(fn func(AST) bool) {
 		for _, a := range cl.TemplateArgs {
 			a.Traverse(fn)
 		}
+		if cl.TemplateArgsConstraint != nil {
+			cl.TemplateArgsConstraint.Traverse(fn)
+		}
 		for _, t := range cl.Types {
 			t.Traverse(fn)
+		}
+		if cl.CallConstraint != nil {
+			cl.CallConstraint.Traverse(fn)
 		}
 	}
 }
@@ -4144,6 +4236,16 @@ func (cl *Closure) Copy(fn func(AST) AST, skip func(AST) bool) AST {
 		}
 	}
 
+	var templateArgsConstraint AST
+	if cl.TemplateArgsConstraint != nil {
+		templateArgsConstraint = cl.TemplateArgsConstraint.Copy(fn, skip)
+		if templateArgsConstraint == nil {
+			templateArgsConstraint = cl.TemplateArgsConstraint
+		} else {
+			changed = true
+		}
+	}
+
 	types := make([]AST, len(cl.Types))
 	for i, t := range cl.Types {
 		tc := t.Copy(fn, skip)
@@ -4155,10 +4257,26 @@ func (cl *Closure) Copy(fn func(AST) AST, skip func(AST) bool) AST {
 		}
 	}
 
+	var callConstraint AST
+	if cl.CallConstraint != nil {
+		callConstraint = cl.CallConstraint.Copy(fn, skip)
+		if callConstraint == nil {
+			callConstraint = cl.CallConstraint
+		} else {
+			changed = true
+		}
+	}
+
 	if !changed {
 		return fn(cl)
 	}
-	cl = &Closure{TemplateArgs: args, Types: types, Num: cl.Num}
+	cl = &Closure{
+		TemplateArgs:           args,
+		TemplateArgsConstraint: templateArgsConstraint,
+		Types:                  types,
+		Num:                    cl.Num,
+		CallConstraint:         callConstraint,
+	}
 	if r := fn(cl); r != nil {
 		return r
 	}
@@ -4170,28 +4288,41 @@ func (cl *Closure) GoString() string {
 }
 
 func (cl *Closure) goString(indent int, field string) string {
-	var args string
+	var args strings.Builder
 	if len(cl.TemplateArgs) == 0 {
-		args = fmt.Sprintf("%*sTemplateArgs: nil", indent+2, "")
+		fmt.Fprintf(&args, "%*sTemplateArgs: nil", indent+2, "")
 	} else {
-		args = fmt.Sprintf("%*sTemplateArgs:", indent+2, "")
+		fmt.Fprintf(&args, "%*sTemplateArgs:", indent+2, "")
 		for i, a := range cl.TemplateArgs {
-			args += "\n"
-			args += a.goString(indent+4, fmt.Sprintf("%d: ", i))
+			args.WriteByte('\n')
+			args.WriteString(a.goString(indent+4, fmt.Sprintf("%d: ", i)))
 		}
 	}
-	var types string
+
+	var templateArgsConstraint string
+	if cl.TemplateArgsConstraint != nil {
+		templateArgsConstraint = "\n" + cl.TemplateArgsConstraint.goString(indent+2, "TemplateArgsConstraint: ")
+	}
+
+	var types strings.Builder
 	if len(cl.Types) == 0 {
-		types = fmt.Sprintf("%*sTypes: nil", indent+2, "")
+		fmt.Fprintf(&types, "%*sTypes: nil", indent+2, "")
 	} else {
-		types = fmt.Sprintf("%*sTypes:", indent+2, "")
+		fmt.Fprintf(&types, "%*sTypes:", indent+2, "")
 		for i, t := range cl.Types {
-			types += "\n"
-			types += t.goString(indent+4, fmt.Sprintf("%d: ", i))
+			types.WriteByte('\n')
+			types.WriteString(t.goString(indent+4, fmt.Sprintf("%d: ", i)))
 		}
 	}
-	return fmt.Sprintf("%*s%sClosure: Num: %d\n%s\n%s", indent, "", field,
-		cl.Num, args, types)
+
+	var callConstraint string
+	if cl.CallConstraint != nil {
+		callConstraint = "\n" + cl.CallConstraint.goString(indent+2, "CallConstraint: ")
+	}
+
+	return fmt.Sprintf("%*s%sClosure: Num: %d\n%s\n%s%s%s", indent, "", field,
+		cl.Num, args.String(), templateArgsConstraint, types.String(),
+		callConstraint)
 }
 
 // StructuredBindings is a structured binding declaration.
@@ -4627,6 +4758,360 @@ func (me *ModuleEntity) goString(indent int, field string) string {
 	return fmt.Sprintf("%*s%sModuleEntity:\n%s\n%s", indent, "", field,
 		me.Module.goString(indent+2, "Module: "),
 		me.Name.goString(indent+2, "Name: "))
+}
+
+// Friend is a member like friend name.
+type Friend struct {
+	Name AST
+}
+
+func (f *Friend) print(ps *printState) {
+	ps.writeString("friend ")
+	ps.print(f.Name)
+}
+
+func (f *Friend) Traverse(fn func(AST) bool) {
+	if fn(f) {
+		f.Name.Traverse(fn)
+	}
+}
+
+func (f *Friend) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(f) {
+		return nil
+	}
+	name := f.Name.Copy(fn, skip)
+	if name == nil {
+		return fn(f)
+	}
+	f = &Friend{Name: name}
+	if r := fn(f); r != nil {
+		return r
+	}
+	return f
+}
+
+func (f *Friend) GoString() string {
+	return f.goString(0, "")
+}
+
+func (f *Friend) goString(indent int, field string) string {
+	return fmt.Sprintf("%*s%sFriend:\n%s", indent, "", field,
+		f.Name.goString(indent+2, "Name: "))
+}
+
+// Constraint represents an AST with a constraint.
+type Constraint struct {
+	Name     AST
+	Requires AST
+}
+
+func (c *Constraint) print(ps *printState) {
+	ps.print(c.Name)
+	ps.writeString(" requires ")
+	ps.print(c.Requires)
+}
+
+func (c *Constraint) Traverse(fn func(AST) bool) {
+	if fn(c) {
+		c.Name.Traverse(fn)
+		c.Requires.Traverse(fn)
+	}
+}
+
+func (c *Constraint) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(c) {
+		return nil
+	}
+	name := c.Name.Copy(fn, skip)
+	requires := c.Requires.Copy(fn, skip)
+	if name == nil && requires == nil {
+		return fn(c)
+	}
+	if name == nil {
+		name = c.Name
+	}
+	if requires == nil {
+		requires = c.Requires
+	}
+	c = &Constraint{Name: name, Requires: requires}
+	if r := fn(c); r != nil {
+		return r
+	}
+	return c
+}
+
+func (c *Constraint) GoString() string {
+	return c.goString(0, "")
+}
+
+func (c *Constraint) goString(indent int, field string) string {
+	return fmt.Sprintf("%*s%sConstraint:\n%s\n%s", indent, "", field,
+		c.Name.goString(indent+2, "Name: "),
+		c.Requires.goString(indent+2, "Requires: "))
+}
+
+// RequiresExpr is a C++20 requires expression.
+type RequiresExpr struct {
+	Params       []AST
+	Requirements []AST
+}
+
+func (re *RequiresExpr) print(ps *printState) {
+	ps.writeString("requires")
+	if len(re.Params) > 0 {
+		ps.writeByte(' ')
+		ps.startScope('(')
+		ps.printList(re.Params, nil)
+		ps.endScope(')')
+	}
+	ps.writeByte(' ')
+	ps.startScope('{')
+	for _, req := range re.Requirements {
+		ps.print(req)
+	}
+	ps.writeByte(' ')
+	ps.endScope('}')
+}
+
+func (re *RequiresExpr) Traverse(fn func(AST) bool) {
+	if fn(re) {
+		for _, p := range re.Params {
+			p.Traverse(fn)
+		}
+		for _, r := range re.Requirements {
+			r.Traverse(fn)
+		}
+	}
+}
+
+func (re *RequiresExpr) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(re) {
+		return nil
+	}
+
+	changed := false
+
+	var params []AST
+	if len(re.Params) > 0 {
+		params = make([]AST, len(re.Params))
+		for i, p := range re.Params {
+			pc := p.Copy(fn, skip)
+			if pc == nil {
+				params[i] = p
+			} else {
+				params[i] = pc
+				changed = true
+			}
+		}
+	}
+
+	requirements := make([]AST, len(re.Requirements))
+	for i, r := range re.Requirements {
+		rc := r.Copy(fn, skip)
+		if rc == nil {
+			requirements[i] = r
+		} else {
+			requirements[i] = rc
+			changed = true
+		}
+	}
+
+	if !changed {
+		return fn(re)
+	}
+
+	re = &RequiresExpr{Params: params, Requirements: requirements}
+	if r := fn(re); r != nil {
+		return r
+	}
+	return re
+}
+
+func (re *RequiresExpr) GoString() string {
+	return re.goString(0, "")
+}
+
+func (re *RequiresExpr) goString(indent int, field string) string {
+	var params strings.Builder
+	if len(re.Params) == 0 {
+		fmt.Fprintf(&params, "%*sParams: nil", indent+2, "")
+	} else {
+		fmt.Fprintf(&params, "%*sParams:", indent+2, "")
+		for i, p := range re.Params {
+			params.WriteByte('\n')
+			params.WriteString(p.goString(indent+4, fmt.Sprintf("%d: ", i)))
+		}
+	}
+
+	var requirements strings.Builder
+	fmt.Fprintf(&requirements, "%*sRequirements:", indent+2, "")
+	for i, r := range re.Requirements {
+		requirements.WriteByte('\n')
+		requirements.WriteString(r.goString(indent+4, fmt.Sprintf("%d: ", i)))
+	}
+
+	return fmt.Sprintf("%*s%sRequirements:\n%s\n%s", indent, "", field,
+		params.String(), requirements.String())
+}
+
+// ExprRequirement is a simple requirement in a requires expression.
+// This is an arbitrary expression.
+type ExprRequirement struct {
+	Expr     AST
+	Noexcept bool
+	TypeReq  AST
+}
+
+func (er *ExprRequirement) print(ps *printState) {
+	ps.writeByte(' ')
+	if er.Noexcept || er.TypeReq != nil {
+		ps.startScope('{')
+	}
+	ps.print(er.Expr)
+	if er.Noexcept || er.TypeReq != nil {
+		ps.endScope('}')
+	}
+	if er.Noexcept {
+		ps.writeString(" noexcept")
+	}
+	if er.TypeReq != nil {
+		ps.writeString(" -> ")
+		ps.print(er.TypeReq)
+	}
+	ps.writeByte(';')
+}
+
+func (er *ExprRequirement) Traverse(fn func(AST) bool) {
+	if fn(er) {
+		er.Expr.Traverse(fn)
+		if er.TypeReq != nil {
+			er.TypeReq.Traverse(fn)
+		}
+	}
+}
+
+func (er *ExprRequirement) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(er) {
+		return nil
+	}
+	expr := er.Expr.Copy(fn, skip)
+	var typeReq AST
+	if er.TypeReq != nil {
+		typeReq = er.TypeReq.Copy(fn, skip)
+	}
+	if expr == nil && typeReq == nil {
+		return fn(er)
+	}
+	if expr == nil {
+		expr = er.Expr
+	}
+	if typeReq == nil {
+		typeReq = er.TypeReq
+	}
+	er = &ExprRequirement{Expr: expr, TypeReq: typeReq}
+	if r := fn(er); r != nil {
+		return r
+	}
+	return er
+}
+
+func (er *ExprRequirement) GoString() string {
+	return er.goString(0, "")
+}
+
+func (er *ExprRequirement) goString(indent int, field string) string {
+	var typeReq string
+	if er.TypeReq != nil {
+		typeReq = "\n" + er.TypeReq.goString(indent+2, "TypeReq: ")
+	}
+
+	return fmt.Sprintf("%*s%sExprRequirement: Noexcept: %t\n%s%s", indent, "", field,
+		er.Noexcept,
+		er.Expr.goString(indent+2, "Expr: "),
+		typeReq)
+}
+
+// TypeRequirement is a type requirement in a requires expression.
+type TypeRequirement struct {
+	Type AST
+}
+
+func (tr *TypeRequirement) print(ps *printState) {
+	ps.writeString(" typename ")
+	ps.print(tr.Type)
+	ps.writeByte(';')
+}
+
+func (tr *TypeRequirement) Traverse(fn func(AST) bool) {
+	if fn(tr) {
+		tr.Type.Traverse(fn)
+	}
+}
+
+func (tr *TypeRequirement) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(tr) {
+		return nil
+	}
+	typ := tr.Type.Copy(fn, skip)
+	if typ == nil {
+		return fn(tr)
+	}
+	tr = &TypeRequirement{Type: typ}
+	if r := fn(tr); r != nil {
+		return r
+	}
+	return tr
+}
+
+func (tr *TypeRequirement) GoString() string {
+	return tr.goString(0, "")
+}
+
+func (tr *TypeRequirement) goString(indent int, field string) string {
+	return fmt.Sprintf("%*s%sTypeRequirement:\n%s", indent, "", field,
+		tr.Type.goString(indent+2, ""))
+}
+
+// NestedRequirement is a nested requirement in a requires expression.
+type NestedRequirement struct {
+	Constraint AST
+}
+
+func (nr *NestedRequirement) print(ps *printState) {
+	ps.writeString(" requires ")
+	ps.print(nr.Constraint)
+	ps.writeByte(';')
+}
+
+func (nr *NestedRequirement) Traverse(fn func(AST) bool) {
+	if fn(nr) {
+		nr.Constraint.Traverse(fn)
+	}
+}
+
+func (nr *NestedRequirement) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(nr) {
+		return nil
+	}
+	constraint := nr.Constraint.Copy(fn, skip)
+	if constraint == nil {
+		return fn(nr)
+	}
+	nr = &NestedRequirement{Constraint: constraint}
+	if r := fn(nr); r != nil {
+		return r
+	}
+	return nr
+}
+
+func (nr *NestedRequirement) GoString() string {
+	return nr.goString(0, "")
+}
+
+func (nr *NestedRequirement) goString(indent int, field string) string {
+	return fmt.Sprintf("%*s%sNestedRequirement:\n%s", indent, "", field,
+		nr.Constraint.goString(indent+2, ""))
 }
 
 // Print the inner types.

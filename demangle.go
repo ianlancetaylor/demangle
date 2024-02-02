@@ -301,6 +301,8 @@ type state struct {
 	// a lambda, plus 1 so that 0 means not parsing a lambda.
 	lambdaTemplateLevel int
 
+	parsingConstraint bool // whether parsing a constraint expression
+
 	// Counts of template parameters without template arguments,
 	// for lambdas.
 	typeTemplateParamCount     int
@@ -473,6 +475,11 @@ func (st *state) encoding(params bool, local forLocalNameType) AST {
 
 	ft := st.bareFunctionType(hasReturnType(a))
 
+	var constraint AST
+	if len(st.str) > 0 && st.str[0] == 'Q' {
+		constraint = st.constraintExpr()
+	}
+
 	if template != nil {
 		st.templates = st.templates[:len(st.templates)-1]
 		st.lambdaTemplateLevel = oldLambdaTemplateLevel
@@ -510,6 +517,10 @@ func (st *state) encoding(params bool, local forLocalNameType) AST {
 
 	if len(enableIfArgs) > 0 {
 		r = &EnableIf{Type: r, Args: enableIfArgs}
+	}
+
+	if constraint != nil {
+		r = &Constraint{Name: r, Requires: constraint}
 	}
 
 	return r
@@ -715,7 +726,7 @@ func (st *state) prefix() AST {
 		var next AST
 
 		c := st.str[0]
-		if isDigit(c) || isLower(c) || c == 'U' || c == 'L' || c == 'W' || (c == 'D' && len(st.str) > 1 && st.str[1] == 'C') {
+		if isDigit(c) || isLower(c) || c == 'U' || c == 'L' || c == 'F' || c == 'W' || (c == 'D' && len(st.str) > 1 && st.str[1] == 'C') {
 			un, isUnCast := st.unqualifiedName(module)
 			next = un
 			module = nil
@@ -873,6 +884,12 @@ func (st *state) unqualifiedName(module AST) (r AST, isCast bool) {
 
 	module = st.moduleName(module)
 
+	friend := false
+	if len(st.str) > 0 && st.str[0] == 'F' {
+		st.advance(1)
+		friend = true
+	}
+
 	var a AST
 	isCast = false
 	c := st.str[0]
@@ -937,6 +954,10 @@ func (st *state) unqualifiedName(module AST) (r AST, isCast bool) {
 
 	if len(st.str) > 0 && st.str[0] == 'B' {
 		a = st.taggedName(a)
+	}
+
+	if friend {
+		a = &Friend{Name: a}
 	}
 
 	return a, isCast
@@ -1739,6 +1760,20 @@ func (st *state) demangleType(isCast bool) AST {
 			st.advance(1)
 			ret = &BitIntType{Size: size, Signed: signed}
 
+		case 'k':
+			constraint := st.name()
+			ret = &SuffixType{
+				Base:   constraint,
+				Suffix: "auto",
+			}
+
+		case 'K':
+			constraint := st.name()
+			ret = &SuffixType{
+				Base:   constraint,
+				Suffix: "decltype(auto)",
+			}
+
 		default:
 			st.fail("unrecognized D code in type")
 		}
@@ -1966,6 +2001,10 @@ func (st *state) parmlist() []AST {
 			// This is a function ref-qualifier.
 			break
 		}
+		if st.str[0] == 'Q' {
+			// This is a requires clause.
+			break
+		}
 		ptype := st.demangleType(false)
 		ret = append(ret, ptype)
 	}
@@ -2162,6 +2201,7 @@ func (st *state) compactNumber() int {
 // this out in substitution and simplify.
 func (st *state) templateParam() AST {
 	off := st.off
+	str := st.str
 	st.checkChar('T')
 
 	level := 0
@@ -2171,6 +2211,12 @@ func (st *state) templateParam() AST {
 	}
 
 	n := st.compactNumber()
+
+	// We don't try to substitute template parameters in a
+	// constraint expression.
+	if st.parsingConstraint {
+		return &Name{Name: str[:st.off-1-off]}
+	}
 
 	if level >= len(st.templates) {
 		if st.lambdaTemplateLevel > 0 && level == st.lambdaTemplateLevel-1 {
@@ -2261,6 +2307,15 @@ func (st *state) templateArgs() []AST {
 	for len(st.str) == 0 || st.str[0] != 'E' {
 		arg := st.templateArg(ret)
 		ret = append(ret, arg)
+
+		if len(st.str) > 0 && st.str[0] == 'Q' {
+			// A list of template arguments can have a
+			// constraint, but we don't demangle it.
+			st.constraintExpr()
+			if len(st.str) == 0 || st.str[0] != 'E' {
+				st.fail("expected end of template arguments after constraint")
+			}
+		}
 	}
 	st.advance(1)
 	return ret
@@ -2554,6 +2609,8 @@ func (st *state) expression() AST {
 			Left:  name,
 			Right: &ExprList{Exprs: args},
 		}
+	} else if st.str[0] == 'r' && len(st.str) > 1 && (st.str[1] == 'q' || st.str[1] == 'Q') {
+		return st.requiresExpr()
 	} else {
 		if len(st.str) < 2 {
 			st.fail("missing operator code")
@@ -2806,6 +2863,83 @@ func (st *state) baseUnresolvedName() AST {
 	return n
 }
 
+// requiresExpr parses:
+//
+//	<expression> ::= rQ <bare-function-type> _ <requirement>+ E
+//	             ::= rq <requirement>+ E
+//	<requirement> ::= X <expression> [N] [R <type-constraint>]
+//	              ::= T <type>
+//	              ::= Q <constraint-expression>
+func (st *state) requiresExpr() AST {
+	st.checkChar('r')
+	if len(st.str) == 0 || (st.str[0] != 'q' && st.str[0] != 'Q') {
+		st.fail("expected q or Q in requires clause in expression")
+	}
+	kind := st.str[0]
+	st.advance(1)
+
+	var params []AST
+	if kind == 'Q' {
+		for len(st.str) > 0 && st.str[0] != '_' {
+			typ := st.demangleType(false)
+			params = append(params, typ)
+		}
+		st.advance(1)
+	}
+
+	var requirements []AST
+	for len(st.str) > 0 && st.str[0] != 'E' {
+		var req AST
+		switch st.str[0] {
+		case 'X':
+			st.advance(1)
+			expr := st.expression()
+			var noexcept bool
+			if len(st.str) > 0 && st.str[0] == 'N' {
+				st.advance(1)
+				noexcept = true
+			}
+			var typeReq AST
+			if len(st.str) > 0 && st.str[0] == 'R' {
+				st.advance(1)
+				typeReq = st.name()
+			}
+			req = &ExprRequirement{
+				Expr:     expr,
+				Noexcept: noexcept,
+				TypeReq:  typeReq,
+			}
+
+		case 'T':
+			st.advance(1)
+			typ := st.demangleType(false)
+			req = &TypeRequirement{Type: typ}
+
+		case 'Q':
+			st.advance(1)
+			// We parse a regular expression rather than a
+			// constraint expression.
+			expr := st.expression()
+			req = &NestedRequirement{Constraint: expr}
+
+		default:
+			st.fail("unrecognized requirement code")
+		}
+
+		requirements = append(requirements, req)
+	}
+
+	if len(st.str) == 0 || st.str[0] != 'E' {
+		st.fail("expected E after requirements")
+	}
+	st.advance(1)
+
+	return &RequiresExpr{
+		Params:       params,
+		Requirements: requirements,
+	}
+}
+
 // exprPrimary parses:
 //
 //	<expr-primary> ::= L <type> <(value) number> E
@@ -2945,6 +3079,11 @@ func (st *state) closureTypeName() AST {
 		template.Args = append(template.Args, templateVal)
 	}
 
+	var templateArgsConstraint AST
+	if len(st.str) > 0 && st.str[0] == 'Q' {
+		templateArgsConstraint = st.constraintExpr()
+	}
+
 	types := st.parmlist()
 
 	st.lambdaTemplateLevel = oldLambdaTemplateLevel
@@ -2953,12 +3092,23 @@ func (st *state) closureTypeName() AST {
 		st.templates = st.templates[:len(st.templates)-1]
 	}
 
+	var callConstraint AST
+	if len(st.str) > 0 && st.str[0] == 'Q' {
+		callConstraint = st.constraintExpr()
+	}
+
 	if len(st.str) == 0 || st.str[0] != 'E' {
 		st.fail("expected E after closure type name")
 	}
 	st.advance(1)
 	num := st.compactNumber()
-	return &Closure{TemplateArgs: templateArgs, Types: types, Num: num}
+	return &Closure{
+		TemplateArgs:           templateArgs,
+		TemplateArgsConstraint: templateArgsConstraint,
+		Types:                  types,
+		Num:                    num,
+		CallConstraint:         callConstraint,
+	}
 }
 
 // templateParamDecl parses:
@@ -3015,6 +3165,7 @@ func (st *state) templateParamDecl() (AST, AST) {
 		name := mk("$TT", &st.templateTemplateParamCount)
 		var params []AST
 		var template *Template
+		var constraint AST
 		for {
 			if len(st.str) == 0 {
 				st.fail("expected closure template parameter")
@@ -3036,13 +3187,23 @@ func (st *state) templateParamDecl() (AST, AST) {
 				st.templates = append(st.templates, template)
 			}
 			template.Args = append(template.Args, templateVal)
+
+			if len(st.str) > 0 && st.str[0] == 'Q' {
+				// A list of template template
+				// parameters can have a constraint.
+				constraint = st.constraintExpr()
+				if len(st.str) == 0 || st.str[0] != 'E' {
+					st.fail("expected end of template template parameters after constraint")
+				}
+			}
 		}
 		if template != nil {
 			st.templates = st.templates[:len(st.templates)-1]
 		}
 		tp := &TemplateTemplateParam{
-			Name:   name,
-			Params: params,
+			Name:       name,
+			Params:     params,
+			Constraint: constraint,
 		}
 		return tp, name
 	case 'p':
@@ -3068,6 +3229,18 @@ func (st *state) unnamedTypeName() AST {
 	ret := &UnnamedType{Num: num}
 	st.subs.add(ret)
 	return ret
+}
+
+// constraintExpr parses a constraint expression. This is just a
+// regular expression, but template parameters are handled specially.
+func (st *state) constraintExpr() AST {
+	st.checkChar('Q')
+
+	hold := st.parsingConstraint
+	st.parsingConstraint = true
+	defer func() { st.parsingConstraint = hold }()
+
+	return st.expression()
 }
 
 // Recognize a clone suffix.  These are not part of the mangling API,

@@ -445,7 +445,7 @@ func TestFailure(t *testing.T) {
 		},
 		{
 			"_Z1FQ",
-			"unrecognized type code",
+			"expected at least one type",
 			4,
 		},
 		{
