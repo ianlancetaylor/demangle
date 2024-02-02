@@ -1555,6 +1555,15 @@ func (st *state) demangleType(isCast bool) AST {
 	case 'u':
 		st.advance(1)
 		ret = st.sourceName()
+		if len(st.str) > 0 && st.str[0] == 'I' {
+			st.advance(1)
+			base := st.demangleType(false)
+			if len(st.str) == 0 || st.str[0] != 'E' {
+				st.fail("expected E after transformed type")
+			}
+			st.advance(1)
+			ret = &TransformedType{Name: ret.(*Name).Name, Base: base}
+		}
 	case 'F':
 		ret = st.functionType()
 	case 'N', 'W', 'Z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':

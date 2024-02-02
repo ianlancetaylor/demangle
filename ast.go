@@ -1200,6 +1200,49 @@ func (st *SuffixType) goString(indent int, field string) string {
 		st.Suffix, st.Base.goString(indent+2, "Base: "))
 }
 
+// TransformedType is a builtin type with a template argument.
+type TransformedType struct {
+	Name string
+	Base AST
+}
+
+func (tt *TransformedType) print(ps *printState) {
+	ps.writeString(tt.Name)
+	ps.startScope('(')
+	ps.print(tt.Base)
+	ps.endScope(')')
+}
+
+func (tt *TransformedType) Traverse(fn func(AST) bool) {
+	if fn(tt) {
+		tt.Base.Traverse(fn)
+	}
+}
+
+func (tt *TransformedType) Copy(fn func(AST) AST, skip func(AST) bool) AST {
+	if skip(tt) {
+		return nil
+	}
+	base := tt.Base.Copy(fn, skip)
+	if base == nil {
+		return fn(tt)
+	}
+	tt = &TransformedType{Name: tt.Name, Base: base}
+	if r := fn(tt); r != nil {
+		return r
+	}
+	return tt
+}
+
+func (tt *TransformedType) GoString() string {
+	return tt.goString(0, "")
+}
+
+func (tt *TransformedType) goString(indent int, field string) string {
+	return fmt.Sprintf("%*s%sTransformedType: %s\n%s", indent, "", field,
+		tt.Name, tt.Base.goString(indent+2, "Base: "))
+}
+
 // VendorQualifier is a type qualified by a vendor-specific qualifier.
 type VendorQualifier struct {
 	Qualifier AST
