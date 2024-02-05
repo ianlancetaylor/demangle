@@ -2989,12 +2989,8 @@ func (u *Unary) print(ps *printState) {
 				wantParens = true
 			default:
 				wantParens = true
-				opPrec := precUnary
-				if op != nil {
-					opPrec = op.precedence
-				}
 				if p, ok := expr.(hasPrec); ok {
-					if p.prec() < opPrec {
+					if p.prec() < op.precedence {
 						wantParens = false
 					}
 				}
