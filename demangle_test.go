@@ -521,6 +521,11 @@ func TestFailure(t *testing.T) {
 			"template parameter not in scope",
 			17,
 		},
+		{
+			"_ZZF",
+			"expected unqualified name",
+			4,
+		},
 	}
 
 	for _, test := range tests {
