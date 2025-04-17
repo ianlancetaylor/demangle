@@ -186,7 +186,8 @@ func ToAST(name string, options ...Option) (AST, error) {
 		i := 0
 		for i < len(options) {
 			if options[i] == NoParams {
-				options = append(options[:i], options[i+1:]...)
+				// Make sure not to modify the original slice's backing storage.
+				options = append(append(make([]Option, 0, len(options)-1), options[:i]...), options[i+1:]...)
 			} else {
 				i++
 			}
