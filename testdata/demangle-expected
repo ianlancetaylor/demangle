@@ -1493,3 +1493,7 @@ decltype ({parm#1}.A::x) f<A>(A)
 
 _Z2f6IP1AEDtptfp_gssr1A1BE1xET_
 decltype ({parm#1}->(::A::B::x)) f6<A*>(A*)
+
+# Tests a `runtime error: index out of range [0]` panic.
+_ZNW5_upee
+_ZNW5_upee
