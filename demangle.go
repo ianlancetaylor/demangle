@@ -1757,7 +1757,19 @@ func (st *state) demangleType(isCast bool) AST {
 					st.fail("expected non-zero number of bits")
 				}
 				st.advance(1)
-				ret = &BinaryFP{Bits: bits}
+				ret = &BinaryFP{Bits: bits, Suffix: ""}
+			} else if len(st.str) > 0 && st.str[0] == 'x' {
+				if bits == 0 {
+					st.fail("expected non-zero number of bits")
+				}
+				st.advance(1)
+				ret = &BinaryFP{Bits: bits, Suffix: "x"}
+			} else if len(st.str) > 0 && st.str[0] == 'b' {
+				if bits != 16 {
+					st.fail("expected bits to be 16 for std::bfloat16_t")
+				}
+				st.advance(1)
+				ret = &BuiltinType{Name: "std::bfloat16_t"}
 			} else {
 				base := st.demangleType(isCast)
 				if len(st.str) > 0 && isDigit(st.str[0]) {
