@@ -896,11 +896,11 @@ func (st *state) prefix() AST {
 //
 //	 <local-source-name>	::= L <source-name> <discriminator>
 func (st *state) unqualifiedName(module AST) (r AST, isCast bool) {
+	module = st.moduleName(module)
+
 	if len(st.str) < 1 {
 		st.fail("expected unqualified name")
 	}
-
-	module = st.moduleName(module)
 
 	friend := false
 	if len(st.str) > 0 && st.str[0] == 'F' {
