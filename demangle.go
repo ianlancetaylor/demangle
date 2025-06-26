@@ -3455,6 +3455,16 @@ func (st *state) substitution(forPrefix bool) AST {
 				// as a template parameter, so we may have
 				// to change back when substituting.
 				index = a.Index
+			case *PackExpansion:
+				// Find the possibly-new argument pack.
+				pack := st.findArgumentPack(a.Base)
+				if pack != a.Pack {
+					return &PackExpansion{
+						Base: a.Base,
+						Pack: pack,
+					}
+				}
+				return nil
 			default:
 				return nil
 			}
