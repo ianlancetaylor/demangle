@@ -87,6 +87,11 @@ type printState struct {
 	// inside some other set of parentheses.
 	scopes int
 
+	// lambdaTemplateArgs is true if we are printing the template
+	// arguments to a lambda with explicit template parameters.
+	// In that case template parameters are printed without names.
+	lambdaTemplateArgs bool
+
 	buf  strings.Builder
 	last byte // Last byte written to buffer.
 
@@ -2422,8 +2427,12 @@ type TemplateParamName struct {
 
 func (tpn *TemplateParamName) print(ps *printState) {
 	ps.writeString(tpn.Prefix)
-	if tpn.Index > 0 {
-		ps.writeString(fmt.Sprintf("%d", tpn.Index-1))
+	if ps.llvmStyle {
+		if tpn.Index > 0 {
+			ps.writeString(fmt.Sprintf("%d", tpn.Index-1))
+		}
+	} else {
+		ps.writeString(fmt.Sprintf("%d", tpn.Index))
 	}
 }
 
@@ -2443,11 +2452,7 @@ func (tpn *TemplateParamName) GoString() string {
 }
 
 func (tpn *TemplateParamName) goString(indent int, field string) string {
-	name := tpn.Prefix
-	if tpn.Index > 0 {
-		name += fmt.Sprintf("%d", tpn.Index-1)
-	}
-	return fmt.Sprintf("%*s%sTemplateParamName: %s", indent, "", field, name)
+	return fmt.Sprintf("%*s%sTemplateParamName: %s%d", indent, "", field, tpn.Prefix, tpn.Index)
 }
 
 // TypeTemplateParam is a type template parameter that appears in a
@@ -2457,9 +2462,17 @@ type TypeTemplateParam struct {
 }
 
 func (ttp *TypeTemplateParam) print(ps *printState) {
-	ps.writeString("typename ")
+	ps.writeString("typename")
+	if ps.llvmStyle {
+		ps.writeByte(' ')
+	}
 	ps.printInner(false)
-	ps.print(ttp.Name)
+	if ps.llvmStyle || !ps.lambdaTemplateArgs {
+		if !ps.llvmStyle {
+			ps.writeByte(' ')
+		}
+		ps.print(ttp.Name)
+	}
 }
 
 func (ttp *TypeTemplateParam) Traverse(fn func(AST) bool) {
@@ -2503,8 +2516,10 @@ func (nttp *NonTypeTemplateParam) print(ps *printState) {
 	ps.inner = append(ps.inner, nttp)
 	ps.print(nttp.Type)
 	if len(ps.inner) > 0 {
-		ps.writeByte(' ')
-		ps.print(nttp.Name)
+		if ps.llvmStyle || !ps.lambdaTemplateArgs {
+			ps.writeByte(' ')
+			ps.print(nttp.Name)
+		}
 		ps.inner = ps.inner[:len(ps.inner)-1]
 	}
 }
@@ -2563,14 +2578,30 @@ type TemplateTemplateParam struct {
 func (ttp *TemplateTemplateParam) print(ps *printState) {
 	scopes := ps.scopes
 	ps.scopes = 0
+	lambdaTemplateArgs := ps.lambdaTemplateArgs
+	ps.lambdaTemplateArgs = true
+	inner := ps.inner
+	ps.inner = nil
 
 	ps.writeString("template<")
 	ps.printList(ttp.Params, nil)
-	ps.writeString("> typename ")
+	ps.writeString("> ")
+	if ps.llvmStyle {
+		ps.writeString("typename")
+	} else {
+		ps.writeString("class")
+	}
 
 	ps.scopes = scopes
+	ps.lambdaTemplateArgs = lambdaTemplateArgs
+	ps.inner = inner
 
-	ps.print(ttp.Name)
+	ps.printInner(false)
+
+	if ps.llvmStyle || !ps.lambdaTemplateArgs {
+		ps.writeByte(' ')
+		ps.print(ttp.Name)
+	}
 
 	if ttp.Constraint != nil {
 		ps.writeString(" requires ")
@@ -2734,13 +2765,18 @@ func (tpp *TemplateParamPack) print(ps *printState) {
 	defer func() { ps.inner = holdInner }()
 
 	ps.inner = []AST{tpp}
-	if nttp, ok := tpp.Param.(*NonTypeTemplateParam); ok {
+	nttp, isNTTP := tpp.Param.(*NonTypeTemplateParam)
+	if isNTTP {
 		ps.print(nttp.Type)
 	} else {
 		ps.print(tpp.Param)
 	}
 	if len(ps.inner) > 0 {
 		ps.writeString("...")
+		if isNTTP && (ps.llvmStyle || !ps.lambdaTemplateArgs) {
+			ps.writeByte(' ')
+			ps.print(nttp.Name)
+		}
 	}
 }
 
