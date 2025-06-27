@@ -2993,17 +2993,11 @@ func (u *Unary) print(ps *printState) {
 	}
 
 	if !u.Suffix {
-		isDelete := op != nil && (op.Name == "delete " || op.Name == "delete[] ")
+		alwaysParens := u.SizeofType || (op != nil && (op.Name == "__alignof__" || op.Name == "noexcept"))
 		if op != nil && op.Name == "::" {
 			// Don't use parentheses after ::.
 			ps.print(expr)
-		} else if u.SizeofType {
-			// Always use parentheses for sizeof argument.
-			ps.startScope('(')
-			ps.print(expr)
-			ps.endScope(')')
-		} else if op != nil && op.Name == "__alignof__" {
-			// Always use parentheses for __alignof__ argument.
+		} else if alwaysParens {
 			ps.startScope('(')
 			ps.print(expr)
 			ps.endScope(')')
@@ -3016,7 +3010,7 @@ func (u *Unary) print(ps *printState) {
 				wantParens = false
 			case op.Name == "&":
 				wantParens = false
-			case isDelete:
+			case op.Name == "delete" || op.Name == "delete[]":
 				wantParens = false
 			case op.Name == "alignof ":
 				wantParens = true
@@ -4842,8 +4836,13 @@ type Friend struct {
 }
 
 func (f *Friend) print(ps *printState) {
-	ps.writeString("friend ")
+	if ps.llvmStyle {
+		ps.writeString("friend ")
+	}
 	ps.print(f.Name)
+	if !ps.llvmStyle {
+		ps.writeString("[friend]")
+	}
 }
 
 func (f *Friend) Traverse(fn func(AST) bool) {
@@ -4877,13 +4876,23 @@ func (f *Friend) goString(indent int, field string) string {
 }
 
 // Constraint represents an AST with a constraint.
+// ForTemplateArgs is true if this constraint was found at the
+// end of a list of template arguments. We need that because
+// in LLVM style we don't print constraints of that sort.
 type Constraint struct {
-	Name     AST
-	Requires AST
+	Name            AST
+	Requires        AST
+	ForTemplateArgs bool
 }
 
 func (c *Constraint) print(ps *printState) {
 	ps.print(c.Name)
+
+	// For LLVM style skip the constraint on a template.
+	if ps.llvmStyle && c.ForTemplateArgs {
+		return
+	}
+
 	ps.writeString(" requires ")
 	ps.print(c.Requires)
 }
@@ -4910,7 +4919,11 @@ func (c *Constraint) Copy(fn func(AST) AST, skip func(AST) bool) AST {
 	if requires == nil {
 		requires = c.Requires
 	}
-	c = &Constraint{Name: name, Requires: requires}
+	c = &Constraint{
+		Name:            name,
+		Requires:        requires,
+		ForTemplateArgs: c.ForTemplateArgs,
+	}
 	if r := fn(c); r != nil {
 		return r
 	}
@@ -4922,7 +4935,8 @@ func (c *Constraint) GoString() string {
 }
 
 func (c *Constraint) goString(indent int, field string) string {
-	return fmt.Sprintf("%*s%sConstraint:\n%s\n%s", indent, "", field,
+	return fmt.Sprintf("%*s%sConstraint: ForTemplateArgs: %t\n%s\n%s", indent, "", field,
+		c.ForTemplateArgs,
 		c.Name.goString(indent+2, "Name: "),
 		c.Requires.goString(indent+2, "Requires: "))
 }

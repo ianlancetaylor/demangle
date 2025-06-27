@@ -393,11 +393,11 @@ func TestDemangler(t *testing.T) {
 		},
 		{
 			"_ZZNK1P1A1B1CIZNS0_1DIJETpTnRiJENS0_1E1F1GEvEENS_1HIFvDpT_EEEN1J1KINS0_1LIT1_EEEEEUlPNSF_IS7_EEE_SJ_EcvNS8_IFT_DpT0_EEEIvJEQsr1ME1NITL0__SN_PT0_DpTL0_0_EEEvENKUllE_clEl",
-			"P::A::B::C<P::A::D<, P::A::E::F::G, void>(J::K<P::A::L<P::A::E::F::G> >)::{lambda(P::A::L<P::A::E::F::G>*)#1}, P::A::L<P::A::E::F::G> >::operator P::H<void (()...)><void>() const::{lambda(long)#1}::operator()(long) const",
-			"P::A::B::C<P::A::D<, P::A::E::F::G, void>(J::K<P::A::L<P::A::E::F::G> >)::{lambda(P::A::L<P::A::E::F::G>*)#1}, P::A::L<P::A::E::F::G> >::operator P::H<void (()...)><void>() const::{lambda(long)#1}::operator()",
-			"P::A::B::C::operator P::H() const::{lambda(long)#1}::operator()(long) const",
-			"P::A::B::C<P::A::D<, P::A::E::F::G, void>()::{lambda(P::A::L<P::A::E::F::G>*)#1}, P::A::L<P::A::E::F::G> >::operator P::H<void (()...)><void>() const::{lambda(long)#1}::operator()(long) const",
-			"P::A::B::C::operator P::H() const::{lambda(long)#1}::operator()",
+			"P::A::B::C<P::A::D<, P::A::E::F::G, void>(J::K<P::A::L<P::A::E::F::G> >)::{lambda(P::A::L<P::A::E::F::G>*)#1}, P::A::L<P::A::E::F::G> >::operator P::H<void (()...)><void>() const requires M::N<TL0_, T0, T0*, TL0_0...>::{lambda(long)#1}::operator()(long) const",
+			"P::A::B::C<P::A::D<, P::A::E::F::G, void>(J::K<P::A::L<P::A::E::F::G> >)::{lambda(P::A::L<P::A::E::F::G>*)#1}, P::A::L<P::A::E::F::G> >::operator P::H<void (()...)><void>() const requires M::N<TL0_, T0, T0*, TL0_0...>::{lambda(long)#1}::operator()",
+			"P::A::B::C::operator P::H() const requires M::N::{lambda(long)#1}::operator()(long) const",
+			"P::A::B::C<P::A::D<, P::A::E::F::G, void>()::{lambda(P::A::L<P::A::E::F::G>*)#1}, P::A::L<P::A::E::F::G> >::operator P::H<void (()...)><void>() const requires M::N<TL0_, T0, T0*, TL0_0...>::{lambda(long)#1}::operator()(long) const",
+			"P::A::B::C::operator P::H() const requires M::N::{lambda(long)#1}::operator()",
 		},
 	}
 
