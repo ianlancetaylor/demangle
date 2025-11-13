@@ -531,6 +531,11 @@ func TestFailure(t *testing.T) {
 			"expected unqualified name",
 			6,
 		},
+		{
+			"_ZNFcv1A",
+			"expected prefix",
+			8,
+		},
 	}
 
 	for _, test := range tests {

@@ -775,8 +775,14 @@ func (st *state) prefix() AST {
 			next = un
 			module = nil
 			if isUnCast {
+				if m, ok := un.(*ModuleEntity); ok {
+					un = m.Name
+				}
 				if tn, ok := un.(*TaggedName); ok {
 					un = tn.Name
+				}
+				if f, ok := un.(*Friend); ok {
+					un = f.Name
 				}
 				cast = un.(*Cast)
 			}
