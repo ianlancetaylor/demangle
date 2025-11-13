@@ -536,6 +536,11 @@ var failureTests = []struct {
 		"expected prefix",
 		8,
 	},
+	{
+		"_ZZW1A1A1AZcvCS_1A000",
+		"expected positive number",
+		21,
+	},
 }
 
 // Test for some failure cases.
