@@ -154,12 +154,13 @@ func TestCases(t *testing.T) {
 // demangle package when it is used by other code.
 //
 // The file does not contain any code, only test cases and comments.
-func readCases(t *testing.T) [][2]string {
+func readCases(t testing.TB) [][2]string {
 	const fn = "testdata/DemangleTestCases.inc"
 	f, err := os.Open(fn)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer f.Close()
 
 	var cases [][2]string
 	r := bufio.NewReader(f)
@@ -215,7 +216,7 @@ func readCases(t *testing.T) [][2]string {
 }
 
 // readCasesString reads a quoted string from the cases file.
-func readCasesString(t *testing.T, r *bufio.Reader, fn string, lineno *int) string {
+func readCasesString(t testing.TB, r *bufio.Reader, fn string, lineno *int) string {
 	b, atEOF := readCasesUnquotedByte(t, r, fn, lineno)
 	if atEOF {
 		t.Fatalf(`%s:%d: got EOF, want "`, fn, *lineno)
@@ -299,7 +300,7 @@ func readCasesString(t *testing.T, r *bufio.Reader, fn string, lineno *int) stri
 // where the byte is not in a quoted string.
 // This skips comments and whitespace.
 // The bool result reports whether we are at EOF.
-func readCasesUnquotedByte(t *testing.T, r *bufio.Reader, fn string, lineno *int) (byte, bool) {
+func readCasesUnquotedByte(t testing.TB, r *bufio.Reader, fn string, lineno *int) (byte, bool) {
 	for {
 		b, atEOF := readCasesByte(t, r, fn, *lineno)
 		if atEOF {
@@ -340,7 +341,7 @@ func readCasesUnquotedByte(t *testing.T, r *bufio.Reader, fn string, lineno *int
 
 // readCasesUnquotedByteNoEOF is like readCasesUnquotedByte,
 // but fails on EOF.
-func readCasesUnquotedByteNoEOF(t *testing.T, r *bufio.Reader, fn string, lineno *int) byte {
+func readCasesUnquotedByteNoEOF(t testing.TB, r *bufio.Reader, fn string, lineno *int) byte {
 	b, atEOF := readCasesUnquotedByte(t, r, fn, lineno)
 	if atEOF {
 		t.Helper()
@@ -351,7 +352,7 @@ func readCasesUnquotedByteNoEOF(t *testing.T, r *bufio.Reader, fn string, lineno
 
 // readCasesByte reads a byte from the cases file.
 // The bool result reports whether we are at EOF.
-func readCasesByte(t *testing.T, r *bufio.Reader, fn string, lineno int) (byte, bool) {
+func readCasesByte(t testing.TB, r *bufio.Reader, fn string, lineno int) (byte, bool) {
 	b, err := r.ReadByte()
 	if err != nil {
 		if err == io.EOF {
@@ -364,7 +365,7 @@ func readCasesByte(t *testing.T, r *bufio.Reader, fn string, lineno int) (byte, 
 }
 
 // readCasesByteNoEOF is like readCasesByte, but fails on EOF.
-func readCasesByteNoEOF(t *testing.T, r *bufio.Reader, fn string, lineno int) byte {
+func readCasesByteNoEOF(t testing.TB, r *bufio.Reader, fn string, lineno int) byte {
 	b, atEOF := readCasesByte(t, r, fn, lineno)
 	if atEOF {
 		t.Helper()

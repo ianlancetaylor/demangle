@@ -66,6 +66,7 @@ func TestExpected(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer f.Close()
 	scanner := bufio.NewScanner(f)
 	lineno := 1
 	for {
@@ -77,37 +78,7 @@ func TestExpected(t *testing.T) {
 		input := getLine(t, scanner, &lineno)
 		expect := getLine(t, scanner, &lineno)
 
-		testNoParams := false
-		skip := false
-		if len(format) > 0 && format[0] == '-' {
-			for _, arg := range strings.Fields(format) {
-				switch arg {
-				case "--format=gnu-v3":
-				case "--format=auto":
-					if !strings.HasPrefix(input, "_Z") {
-						skip = true
-					}
-				case "--no-params":
-					testNoParams = true
-				case "--ret-postfix", "--ret-drop":
-					skip = true
-				case "--is-v3-ctor", "--is-v3-dtor":
-					skip = true
-				default:
-					if !strings.HasPrefix(arg, "--format=") {
-						t.Errorf("%s:%d: unrecognized argument %s", filename, report, arg)
-					}
-					skip = true
-				}
-			}
-		}
-
-		// The libiberty testsuite passes DMGL_TYPES to
-		// demangle type names, but that doesn't seem useful
-		// and we don't support it.
-		if !strings.HasPrefix(input, "_Z") && !strings.HasPrefix(input, "_GLOBAL_") {
-			skip = true
-		}
+		skip, testNoParams := skipExpectedTest(t, format, input, report)
 
 		var expectNoParams string
 		if testNoParams {
@@ -191,7 +162,7 @@ func oneTest(t *testing.T, report int, input, expect string, params bool) {
 }
 
 // getLine reads a line from demangle-expected.
-func getLine(t *testing.T, scanner *bufio.Scanner, lineno *int) string {
+func getLine(t testing.TB, scanner *bufio.Scanner, lineno *int) string {
 	s, got := getOptLine(t, scanner, lineno)
 	if !got {
 		t.Fatalf("%s:%d: unexpected EOF", filename, *lineno)
@@ -201,7 +172,7 @@ func getLine(t *testing.T, scanner *bufio.Scanner, lineno *int) string {
 
 // getOptLine reads an optional line from demangle-expected, returning
 // false at EOF.  It skips comment lines and updates *lineno.
-func getOptLine(t *testing.T, scanner *bufio.Scanner, lineno *int) (string, bool) {
+func getOptLine(t testing.TB, scanner *bufio.Scanner, lineno *int) (string, bool) {
 	for {
 		if !scanner.Scan() {
 			return "", false
@@ -212,4 +183,40 @@ func getOptLine(t *testing.T, scanner *bufio.Scanner, lineno *int) (string, bool
 			return line, true
 		}
 	}
+}
+
+// skipExpectedTest reports whether to skip a test in demangle-expected.
+// It also returns whether the test has a no-parameter lines.
+func skipExpectedTest(t testing.TB, format, input string, report int) (skip, testNoParams bool) {
+	if len(format) > 0 && format[0] == '-' {
+		for _, arg := range strings.Fields(format) {
+			switch arg {
+			case "--format=gnu-v3":
+			case "--format=auto":
+				if !strings.HasPrefix(input, "_Z") {
+					skip = true
+				}
+			case "--no-params":
+				testNoParams = true
+			case "--ret-postfix", "--ret-drop":
+				skip = true
+			case "--is-v3-ctor", "--is-v3-dtor":
+				skip = true
+			default:
+				if !strings.HasPrefix(arg, "--format=") {
+					t.Errorf("%s:%d: unrecognized argument %s", filename, report, arg)
+				}
+				skip = true
+			}
+		}
+	}
+
+	// The libiberty testsuite passes DMGL_TYPES to
+	// demangle type names, but that doesn't seem useful
+	// and we don't support it.
+	if !strings.HasPrefix(input, "_Z") && !strings.HasPrefix(input, "_GLOBAL_") {
+		skip = true
+	}
+
+	return skip, testNoParams
 }
