@@ -556,6 +556,11 @@ var failureTests = []struct {
 		"not in scope of template",
 		15,
 	},
+	{
+		"_ZNcvaB7A000000B1A",
+		"expected prefix",
+		18,
+	},
 }
 
 // Test for some failure cases.

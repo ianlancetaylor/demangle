@@ -778,7 +778,11 @@ func (st *state) prefix() AST {
 				if m, ok := un.(*ModuleEntity); ok {
 					un = m.Name
 				}
-				if tn, ok := un.(*TaggedName); ok {
+				for {
+					tn, ok := un.(*TaggedName)
+					if !ok {
+						break
+					}
 					un = tn.Name
 				}
 				if f, ok := un.(*Friend); ok {
