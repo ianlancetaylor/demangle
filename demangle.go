@@ -774,7 +774,10 @@ func (st *state) prefix() AST {
 			un, isUnCast := st.unqualifiedName(module)
 			next = un
 			module = nil
-			if isUnCast && cast == nil {
+			if isUnCast {
+				if cast != nil {
+					st.fail("cast in scope of cast")
+				}
 				if m, ok := un.(*ModuleEntity); ok {
 					un = m.Name
 				}

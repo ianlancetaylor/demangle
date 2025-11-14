@@ -553,7 +553,7 @@ var failureTests = []struct {
 	},
 	{
 		"_ZNcvT_cv1AI1AEE",
-		"not in scope of template",
+		"cast in scope of cast",
 		15,
 	},
 	{
@@ -565,6 +565,11 @@ var failureTests = []struct {
 		"_Z1AAoncvT__a",
 		"template parameter not in scope",
 		11,
+	},
+	{
+		"_ZNcv1Acv1AIT_EE",
+		"cast in scope of cast",
+		15,
 	},
 }
 
