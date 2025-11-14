@@ -541,6 +541,11 @@ var failureTests = []struct {
 		"expected positive number",
 		21,
 	},
+	{
+		"_ZN5clang18IdentifierResolver10RemoveDeclEPNS_9NamedDDDDDDDeclE",
+		"unknown destructor type",
+		56,
+	},
 }
 
 // Test for some failure cases.

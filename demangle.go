@@ -801,6 +801,12 @@ func (st *state) prefix() AST {
 				if last == nil {
 					st.fail("constructor before name is seen")
 				}
+				switch st.str[0] {
+				// 0 is not used.
+				case '1', '2', '3', '4', '5':
+				default:
+					st.fail("unknown constructor type")
+				}
 				st.advance(1)
 				var base AST
 				if inheriting {
@@ -822,6 +828,12 @@ func (st *state) prefix() AST {
 					}
 					if last == nil {
 						st.fail("destructor before name is seen")
+					}
+					switch st.str[1] {
+					// 3 is not used.
+					case '0', '1', '2', '4', '5':
+					default:
+						st.fail("unknown destructor type")
 					}
 					st.advance(2)
 					next = &Destructor{Name: getLast(last)}
