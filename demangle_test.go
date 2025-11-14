@@ -546,6 +546,11 @@ var failureTests = []struct {
 		"unknown destructor type",
 		56,
 	},
+	{
+		"_ZN4A000EArQ",
+		"expected requirement parameter",
+		12,
+	},
 }
 
 // Test for some failure cases.

@@ -3066,6 +3066,9 @@ func (st *state) requiresExpr() AST {
 			typ := st.demangleType(false)
 			params = append(params, typ)
 		}
+		if len(st.str) == 0 {
+			st.fail("expected requirement parameter")
+		}
 		st.advance(1)
 	}
 
