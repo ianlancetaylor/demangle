@@ -395,6 +395,14 @@ var demanglerTests = []struct {
 		"P::A::B::C<P::A::D<, P::A::E::F::G, void>()::{lambda(P::A::L<P::A::E::F::G>*)#1}, P::A::L<P::A::E::F::G> >::operator P::H<void (()...)><void>() const requires M::N<TL0_, T0, T0*, TL0_0...>::{lambda(long)#1}::operator()(long) const",
 		"P::A::B::C::operator P::H() const requires M::N::{lambda(long)#1}::operator()",
 	},
+	{
+		"_ZN1AEDwF1BaEEa",
+		"A(signed char throw(B ( throw(B (signed char)))(signed char)))",
+		"A",
+		"A(signed char throw(B ( throw(B (signed char)))(signed char)))",
+		"A(signed char throw(B ( throw(B (signed char)))(signed char)))",
+		"A",
+	},
 }
 
 // Check test cases discovered after the code passed the tests in

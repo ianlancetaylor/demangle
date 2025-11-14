@@ -766,7 +766,12 @@ func (twq *TypeWithQualifiers) print(ps *printState) {
 		// The qualifier wasn't printed by Base.
 		ps.writeByte(' ')
 		ps.print(twq.Qualifiers)
-		ps.inner = ps.inner[:len(ps.inner)-1]
+		// In implausible situations like a throw qualified by a throw,
+		// we may have printed the qualifier already,
+		// so check the length of ps.inner again.
+		if len(ps.inner) > 0 {
+			ps.inner = ps.inner[:len(ps.inner)-1]
+		}
 	}
 }
 
