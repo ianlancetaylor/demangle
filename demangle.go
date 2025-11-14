@@ -2736,7 +2736,10 @@ func (st *state) expression() AST {
 			// Skip operator function ID.
 			st.advance(2)
 		}
-		n, _ := st.unqualifiedName(nil)
+		n, isCast := st.unqualifiedName(nil)
+		if isCast {
+			st.setTemplate(n, nil)
+		}
 		if len(st.str) > 0 && st.str[0] == 'I' {
 			n = st.template(n)
 		}

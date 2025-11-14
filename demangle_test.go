@@ -519,7 +519,7 @@ var failureTests = []struct {
 	{
 		"_ZcvT_IAoncvT__eE",
 		"template parameter not in scope",
-		17,
+		14,
 	},
 	{
 		"_ZZF",
@@ -560,6 +560,11 @@ var failureTests = []struct {
 		"_ZNcvaB7A000000B1A",
 		"expected prefix",
 		18,
+	},
+	{
+		"_Z1AAoncvT__a",
+		"template parameter not in scope",
+		11,
 	},
 }
 
