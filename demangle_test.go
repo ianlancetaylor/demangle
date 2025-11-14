@@ -551,6 +551,11 @@ var failureTests = []struct {
 		"expected requirement parameter",
 		12,
 	},
+	{
+		"_ZNcvT_cv1AI1AEE",
+		"not in scope of template",
+		15,
+	},
 }
 
 // Test for some failure cases.
