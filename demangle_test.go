@@ -579,6 +579,11 @@ var failureTests = []struct {
 		"cast in scope of cast",
 		15,
 	},
+	{
+		"_ZN0_17h0000000000002718E",
+		"expected positive number",
+		4,
+	},
 }
 
 // Test for some failure cases.
