@@ -1006,6 +1006,8 @@ func (st *state) unqualifiedName(module AST) (r AST, isCast bool) {
 				st.advance(2)
 				st.compactNumber()
 				a = &Name{Name: "'block-literal'"}
+			case 'e':
+				a = st.unnamedEnum()
 			case 'l':
 				a = st.closureTypeName()
 			case 't':
@@ -1731,6 +1733,9 @@ func (st *state) demangleType(isCast bool) AST {
 			st.fail("expected source name or unnamed type")
 		}
 		switch st.str[1] {
+		case 'e':
+			ret = st.unnamedEnum()
+			addSubst = false
 		case 'l':
 			ret = st.closureTypeName()
 			addSubst = false
@@ -3430,6 +3435,21 @@ func (st *state) unnamedTypeName() AST {
 	st.checkChar('t')
 	num := st.compactNumber()
 	ret := &UnnamedType{Num: num}
+	st.subs.add(ret)
+	return ret
+}
+
+// unnamedEnum parses an unnamed enum type.
+// https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2115r0.html
+func (st *state) unnamedEnum() AST {
+	st.checkChar('U')
+	st.checkChar('e')
+	typ := st.demangleType(false)
+	name := st.sourceName()
+	ret := &UnnamedEnum{
+		Underlying: typ,
+		Name:       name,
+	}
 	st.subs.add(ret)
 	return ret
 }
