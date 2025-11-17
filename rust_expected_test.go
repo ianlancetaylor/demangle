@@ -33,21 +33,7 @@ func TestRustExpected(t *testing.T) {
 		input := getLine(t, scanner, &lineno)
 		expect := getLine(t, scanner, &lineno)
 
-		skip := false
-		if len(format) > 0 && format[0] == '-' {
-			for _, arg := range strings.Fields(format) {
-				switch arg {
-				case "--format=gnu-v3":
-					skip = true
-				case "--format=auto":
-				case "--format=rust":
-				default:
-					t.Errorf("%s:%d: unrecognized argument %s", rustFilename, report, arg)
-				}
-			}
-		}
-
-		if skip {
+		if skipExpectedRustTest(t, format, input, report) {
 			continue
 		}
 
@@ -88,6 +74,25 @@ func oneRustTest(t *testing.T, report int, input, expect string) {
 			t.Errorf("%s:%d: MaxLength mismatch: %q != %q", rustFilename, report, ss, expect[:64])
 		}
 	}
+}
+
+// skipExpectedRustTest reports whether to skip a test in
+// rust-demangle-expected.
+func skipExpectedRustTest(t testing.TB, format, input string, report int) bool {
+	if len(format) > 0 && format[0] == '-' {
+		for _, arg := range strings.Fields(format) {
+			switch arg {
+			case "--format=gnu-v3":
+				return true
+			case "--format=auto":
+			case "--format=rust":
+			default:
+				t.Errorf("%s:%d: unrecognized argument %s", rustFilename, report, arg)
+				return true
+			}
+		}
+	}
+	return false
 }
 
 const rustCheckFilename = "testdata/rust.test"

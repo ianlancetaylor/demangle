@@ -75,3 +75,65 @@ func FuzzDemangle(f *testing.F) {
 		}
 	})
 }
+
+func FuzzRustDemangle(f *testing.F) {
+	file, err := os.Open(rustFilename)
+	if err != nil {
+		f.Fatal(err)
+	}
+	scanner := bufio.NewScanner(file)
+	lineno := 1
+	for {
+		format, got := getOptLine(f, scanner, &lineno)
+		if !got {
+			break
+		}
+		report := lineno
+		input := getLine(f, scanner, &lineno)
+		getLine(f, scanner, &lineno)
+
+		if skipExpectedRustTest(f, format, input, report) {
+			continue
+		}
+
+		f.Add(input)
+	}
+
+	if err := scanner.Err(); err != nil {
+		f.Error(err)
+	}
+
+	file.Close()
+
+	file, err = os.Open(rustCheckFilename)
+	if err != nil {
+		f.Fatal(err)
+	}
+	scanner = bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if !strings.HasPrefix(line, "CHECK: ") {
+			continue
+		}
+		if !scanner.Scan() {
+			f.Fatalf("%s: unexpected EOF", rustCheckFilename)
+		}
+		input := strings.TrimSpace(scanner.Text())
+		f.Add(input)
+	}
+
+	if err := scanner.Err(); err != nil {
+		f.Error(err)
+	}
+
+	file.Close()
+
+	f.Add(rustMangledTemplates)
+
+	f.Fuzz(func(t *testing.T, in string) {
+		_, err := ToString(in)
+		if err != nil {
+			t.Skip()
+		}
+	})
+}
