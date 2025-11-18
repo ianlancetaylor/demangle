@@ -584,6 +584,11 @@ var failureTests = []struct {
 		"expected positive number",
 		4,
 	},
+	{
+		"_Z1AI1AE1A1AIXplccCT_La0EdicvS4_La0EEE",
+		"template parameter not in scope",
+		32,
+	},
 }
 
 // Test for some failure cases.

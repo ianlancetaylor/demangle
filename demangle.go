@@ -1687,7 +1687,11 @@ func (st *state) demangleType(isCast bool) AST {
 		if isDigit(c2) || c2 == '_' || isUpper(c2) {
 			ret = st.substitution(false)
 			if _, ok := ret.(*ModuleName); ok {
-				ret, _ = st.unqualifiedName(ret)
+				var isCast bool
+				ret, isCast = st.unqualifiedName(ret)
+				if isCast {
+					st.setTemplate(ret, nil)
+				}
 				st.subs.add(ret)
 			}
 			if len(st.str) == 0 || st.str[0] != 'I' {
@@ -2849,7 +2853,11 @@ func (st *state) expression() AST {
 				right = st.expression()
 				return &Fold{Left: code[1] == 'l', Op: left, Arg1: right, Arg2: nil}
 			} else if code == "di" {
-				left, _ = st.unqualifiedName(nil)
+				var isCast bool
+				left, isCast = st.unqualifiedName(nil)
+				if isCast {
+					st.setTemplate(left, nil)
+				}
 			} else {
 				left = st.expression()
 			}
