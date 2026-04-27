@@ -150,8 +150,25 @@ func ToString(name string, options ...Option) (string, error) {
 // error will be ErrNotMangledName.
 // This function does not currently support Rust symbol names.
 func ToAST(name string, options ...Option) (AST, error) {
+	// Clang AllocToken instrumentation.
+	allocToken := false
+	if strings.HasPrefix(name, "__alloc_token_") {
+		allocToken = true
+		name = name[len("__alloc_token_"):]
+		i := 0
+		for i < len(name) && isDigit(name[i]) {
+			i++
+		}
+		if i > 0 && i < len(name) && name[i] == '_' {
+			name = name[i+1:]
+		}
+	}
+
 	if strings.HasPrefix(name, "_Z") {
 		a, err := doDemangle(name[2:], options...)
+		if err == nil && allocToken {
+			a = &Clone{Base: a, Suffix: ".alloc_token"}
+		}
 		return a, adjustErr(err, 2)
 	}
 
