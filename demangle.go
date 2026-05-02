@@ -179,8 +179,8 @@ func ToAST(name string, options ...Option) (AST, error) {
 		return a, nil
 	}
 
-	const prefix = "_GLOBAL_"
-	if strings.HasPrefix(name, prefix) {
+	const ctorDtorPrefix = "_GLOBAL_"
+	if strings.HasPrefix(name, ctorDtorPrefix) {
 		// The standard demangler ignores NoParams for global
 		// constructors.  We are compatible.
 		i := 0
@@ -191,8 +191,14 @@ func ToAST(name string, options ...Option) (AST, error) {
 				i++
 			}
 		}
-		a, err := globalCDtorName(name[len(prefix):], options...)
-		return a, adjustErr(err, len(prefix))
+		a, err := globalCDtorName(name[len(ctorDtorPrefix):], options...)
+		return a, adjustErr(err, len(ctorDtorPrefix))
+	}
+
+	const allocTokenPrefix = "__alloc_token_"
+	if strings.HasPrefix(name, allocTokenPrefix) {
+		a, err := allocToken(name[len(allocTokenPrefix):], options...)
+		return a, adjustErr(err, len(allocTokenPrefix))
 	}
 
 	return nil, ErrNotMangledName
@@ -233,6 +239,40 @@ func globalCDtorName(name string, options ...Option) (AST, error) {
 		}
 		return &GlobalCDtor{Ctor: ctor, Key: a}, nil
 	}
+}
+
+// allocToken handles Clang allocation token names,
+// as described at https://clang.llvm.org/docs/AllocToken.html.
+// Here name is the name after the __alloc_token_ prefix.
+//
+// As far as I can tell only a few such names are ever generated,
+// so I don't know why they introduced a new mangling scheme,
+// but it seems that they did.
+func allocToken(name string, options ...Option) (AST, error) {
+	// Names look like __alloc_token_[num_]NAME
+	// We've skipped the __alloc_token_ already.
+	// The num is not included in the demangled name.
+
+	adj := 0
+	if len(name) > adj && isDigit(name[adj]) {
+		adj++
+		for len(name) > adj && isDigit(name[adj]) {
+			adj++
+		}
+		if len(name) <= adj || name[adj] != '_' {
+			return nil, ErrNotMangledName
+		}
+		adj++
+	}
+	if !strings.HasPrefix(name[adj:], "_Z") {
+		return nil, ErrNotMangledName
+	}
+	adj += 2
+	a, err := doDemangle(name[adj:], options...)
+	if err == nil {
+		a = &Clone{Base: a, Suffix: ".alloc_token"}
+	}
+	return a, adjustErr(err, adj)
 }
 
 // The doDemangle function is the entry point into the demangler proper.
