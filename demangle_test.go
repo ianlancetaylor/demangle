@@ -589,6 +589,11 @@ var failureTests = []struct {
 		"template parameter not in scope",
 		32,
 	},
+	{
+		"_ZcvUlT_E_",
+		"cast template parameter not in scope",
+		10,
+	},
 }
 
 // Test for some failure cases.

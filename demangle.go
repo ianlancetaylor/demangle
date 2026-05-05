@@ -2491,6 +2491,18 @@ func (st *state) setTemplate(a AST, tmpl *Template) {
 		case *Closure:
 			// There are no template params in closure types.
 			// https://gcc.gnu.org/PR78252.
+			if tmpl == nil {
+				a.Traverse(func(a AST) bool {
+					if tmplParam, ok := a.(*TemplateParam); ok && tmplParam.Template == nil {
+						st.fail("cast template parameter not in scope of template")
+					}
+					if seen[a] {
+						return false
+					}
+					seen[a] = true
+					return true
+				})
+			}
 			return false
 		default:
 			if seen[a] {
