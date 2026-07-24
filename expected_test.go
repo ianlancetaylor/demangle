@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -99,6 +100,9 @@ func TestExpected(t *testing.T) {
 	}
 }
 
+// abiTagRE is a regexp that matches ABI tags.
+var abiTagRE = regexp.MustCompile(`\[abi:[^]]*\]`)
+
 // oneTest tests one entry from demangle-expected.
 func oneTest(t *testing.T, report int, input, expect string, params bool) {
 	if *verbose {
@@ -157,6 +161,22 @@ func oneTest(t *testing.T, report int, input, expect string, params bool) {
 			t.Errorf("%s:%d: error with MaxLength: %v", filename, report, err)
 		} else if ss != expect[:64] {
 			t.Errorf("%s:%d: MaxLength mismatch: %q != %q", filename, report, ss, expect[:64])
+		}
+	}
+
+	if s == expect && s != input && params && strings.Contains(expect, "[abi:") {
+		ss, err := ToString(input, NoABITags)
+		if err != nil {
+			t.Errorf("%s:%d: error with NoABITags: %v", filename, report, err)
+		} else {
+			ee := expect
+			matches := abiTagRE.FindAllStringIndex(ee, -1)
+			for i := len(matches) - 1; i >= 0; i-- {
+				ee = ee[:matches[i][0]] + ee[matches[i][1]:]
+			}
+			if ss != ee {
+				t.Errorf("%s:%d: NoABITags mismatch: %q != %q", filename, report, ss, ee)
+			}
 		}
 	}
 }

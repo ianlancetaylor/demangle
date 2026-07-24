@@ -59,6 +59,9 @@ const (
 	// the parsing of the AST, only the conversion of the AST
 	// to a string.
 	LLVMStyle
+
+	// The NoABITags option tells the demangler to ignore ABI tags.
+	NoABITags
 )
 
 // maxLengthShift is how we shift the MaxLength value.
@@ -293,6 +296,7 @@ func doDemangle(name string, options ...Option) (ret AST, err error) {
 	params := true
 	clones := true
 	verbose := false
+	abiTags := true
 	for _, o := range options {
 		switch {
 		case o == NoParams:
@@ -300,6 +304,8 @@ func doDemangle(name string, options ...Option) (ret AST, err error) {
 			clones = false
 		case o == NoClones:
 			clones = false
+		case o == NoABITags:
+			abiTags = false
 		case o == Verbose:
 			verbose = true
 		case o == NoTemplateParams || o == NoEnclosingParams || o == LLVMStyle || isMaxLength(o):
@@ -312,7 +318,7 @@ func doDemangle(name string, options ...Option) (ret AST, err error) {
 		}
 	}
 
-	st := &state{str: name, verbose: verbose}
+	st := &state{str: name, verbose: verbose, abiTags: abiTags}
 	a := st.encoding(params, notForLocalName)
 
 	// Accept a clone suffix.
@@ -333,6 +339,7 @@ func doDemangle(name string, options ...Option) (ret AST, err error) {
 type state struct {
 	str       string        // remainder of string to demangle
 	verbose   bool          // whether to use verbose demangling
+	abiTags   bool          // whether to include ABI tags
 	off       int           // offset of str within original string
 	subs      substitutions // substitutions
 	templates []*Template   // templates being processed
@@ -626,7 +633,9 @@ func (st *state) taggedName(a AST) AST {
 	for len(st.str) > 0 && st.str[0] == 'B' {
 		st.advance(1)
 		tag := st.sourceName()
-		a = &TaggedName{Name: a, Tag: tag}
+		if st.abiTags {
+			a = &TaggedName{Name: a, Tag: tag}
+		}
 	}
 	return a
 }
