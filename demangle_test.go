@@ -403,6 +403,22 @@ var demanglerTests = []struct {
 		"A(signed char throw(B ( throw(B (signed char)))(signed char)))",
 		"A",
 	},
+	{
+		"_Z1aINDwA_eE1bEE",
+		"a<b throw(long double ( throw(long double [])) [])>",
+		"a<b throw(long double ( throw(long double [])) [])>",
+		"a",
+		"a<b throw(long double ( throw(long double [])) [])>",
+		"a",
+	},
+	{
+		"_ZNDwA_eE1aE",
+		"a throw(long double ( throw(long double [])) [])",
+		"a",
+		"a throw(long double ( throw(long double [])) [])",
+		"a throw(long double ( throw(long double [])) [])",
+		"a",
+	},
 }
 
 // Check test cases discovered after the code passed the tests in
