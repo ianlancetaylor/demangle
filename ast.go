@@ -839,7 +839,10 @@ func (mwq *MethodWithQualifiers) print(ps *printState) {
 			ps.writeByte(' ')
 			ps.writeString(mwq.RefQualifier)
 		}
-		ps.inner = ps.inner[:len(ps.inner)-1]
+		// A nested throw may have printed these qualifiers already.
+		if len(ps.inner) > 0 {
+			ps.inner = ps.inner[:len(ps.inner)-1]
+		}
 	}
 }
 
