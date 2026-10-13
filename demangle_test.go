@@ -419,6 +419,14 @@ var demanglerTests = []struct {
 		"a throw(long double ( throw(long double [])) [])",
 		"a",
 	},
+	{
+		"_ZSt12__get_helperILm1ESt14default_deleteINSt6thread6_StateEEIEERT0_RSt11_Tuple_implIXT_EIS4_DpT1_EE",
+		"std::default_delete<std::thread::_State>& std::__get_helper<1ul, std::default_delete<std::thread::_State> >(std::_Tuple_impl<1ul, std::default_delete<std::thread::_State> >&)",
+		"std::__get_helper<1ul, std::default_delete<std::thread::_State> >",
+		"std::default_delete& std::__get_helper(std::_Tuple_impl&)",
+		"std::default_delete<std::thread::_State>& std::__get_helper<1ul, std::default_delete<std::thread::_State> >(std::_Tuple_impl<1ul, std::default_delete<std::thread::_State> >&)",
+		"std::__get_helper",
+	},
 }
 
 // Check test cases discovered after the code passed the tests in

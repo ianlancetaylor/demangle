@@ -2258,11 +2258,16 @@ type ArgumentPack struct {
 }
 
 func (ap *ArgumentPack) print(ps *printState) {
-	for i, a := range ap.Args {
-		if i > 0 {
+	first := true
+	for _, a := range ap.Args {
+		if ps.isEmpty(a) {
+			continue
+		}
+		if !first {
 			ps.writeString(", ")
 		}
 		ps.print(a)
+		first = false
 	}
 }
 
