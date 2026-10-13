@@ -234,7 +234,7 @@ func globalCDtorName(name string, options ...Option) (AST, error) {
 	}
 
 	if !strings.HasPrefix(name[3:], "_Z") {
-		return &GlobalCDtor{Ctor: ctor, Key: &Name{Name: name}}, nil
+		return &GlobalCDtor{Ctor: ctor, Key: &Name{Name: name[3:]}}, nil
 	} else {
 		a, err := doDemangle(name[5:], options...)
 		if err != nil {

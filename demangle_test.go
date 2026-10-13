@@ -419,6 +419,14 @@ var demanglerTests = []struct {
 		"a throw(long double ( throw(long double [])) [])",
 		"a",
 	},
+	{
+		"_GLOBAL__I_a",
+		"global constructors keyed to a",
+		"global constructors keyed to a",
+		"global constructors keyed to a",
+		"global constructors keyed to a",
+		"global constructors keyed to a",
+	},
 }
 
 // Check test cases discovered after the code passed the tests in
