@@ -16,7 +16,6 @@ import (
 // don't expect to pass.  This is to let us incrementally fix them
 // over time.
 var casesExpectedFailures = map[string]bool{
-	"_ZSteqIcEN9__gnu_cxx11__enable_ifIXsr9__is_charIT_EE7__valueEbE6__typeERKSbIS2_St11char_traitsIS2_ESaIS2_EESA_": true,
 	"_Z1fPU11objcproto1A11objc_object":             true,
 	"_Z1fPKU11objcproto1A7NSArray":                 true,
 	"_ZNK1AIJ1Z1Y1XEEcv1BIJDpPT_EEIJS2_S1_S0_EEEv": true,

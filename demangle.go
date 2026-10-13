@@ -3052,9 +3052,11 @@ func (st *state) unresolvedName() AST {
 			return n
 		default:
 			var s AST
+			nested := false
 			if st.str[0] == 'N' {
 				st.advance(1)
 				s = st.demangleType(false)
+				nested = true
 			}
 			for len(st.str) == 0 || st.str[0] != 'E' {
 				// GCC does not seem to follow the ABI here.
@@ -3073,7 +3075,12 @@ func (st *state) unresolvedName() AST {
 				}
 				n := st.sourceName()
 				if len(st.str) > 0 && st.str[0] == 'I' {
-					st.subs.add(n)
+					// Only the srN form is demangled like a
+					// nested name, in which the template name
+					// is a substitution candidate.
+					if nested {
+						st.subs.add(n)
+					}
 					n = st.template(n)
 				}
 				if s == nil {
