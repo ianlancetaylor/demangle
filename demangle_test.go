@@ -229,10 +229,10 @@ var demanglerTests = []struct {
 	},
 	{
 		"_Z1CIP1DEiRK1EPT_N1F1GIS5_Xaasr1HIS5_E1IntsrSA_1JEE1KE",
-		"int C<D*>(E const&, D**, F::G<D*, H<D*>::I&&(!H::J)>::K)",
+		"int C<D*>(E const&, D**, F::G<D*, H<D*>::I&&(!H<D*>::J)>::K)",
 		"C<D*>",
 		"int C(E const&, D**, F::G::K)",
-		"int C<D*>(E const&, D**, F::G<D*, H<D*>::I&&(!H::J)>::K)",
+		"int C<D*>(E const&, D**, F::G<D*, H<D*>::I&&(!H<D*>::J)>::K)",
 		"C",
 	},
 	{
@@ -245,18 +245,18 @@ var demanglerTests = []struct {
 	},
 	{
 		"_ZNSt1AIFSt1BImjEjEZN1C1DI1EEENSt1FIXeqsr1G1H1IIDTadsrT_onclEEE1JLi2EEvE1KEPKcSC_OS7_EUljE_E1KERKSt1Lj",
-		"std::A<std::B<unsigned long, unsigned int> (unsigned int), C::D<E>(char const*, char const, I&&)::{lambda(unsigned int)#1}>::K(std::L const&, unsigned int)",
-		"std::A<std::B<unsigned long, unsigned int> (unsigned int), C::D<E>(char const*, char const, I&&)::{lambda(unsigned int)#1}>::K",
+		"std::A<std::B<unsigned long, unsigned int> (unsigned int), C::D<E>(char const*, char const*, E&&)::{lambda(unsigned int)#1}>::K(std::L const&, unsigned int)",
+		"std::A<std::B<unsigned long, unsigned int> (unsigned int), C::D<E>(char const*, char const*, E&&)::{lambda(unsigned int)#1}>::K",
 		"std::A::K(std::L const&, unsigned int)",
 		"std::A<std::B<unsigned long, unsigned int> (unsigned int), C::D<E>()::{lambda(unsigned int)#1}>::K(std::L const&, unsigned int)",
 		"std::A::K",
 	},
 	{
 		"_ZNSt1A1BIiNS_1CIiEEE1DIPiEENS_1EIXaasr1FIT_EE1Gsr1HIiNS_1IIS7_E1JEEE1KEvE1LES7_S7_",
-		"std::A::E<F<int*>::G&&H<int, std::A::I<F>::J>::K, void>::L std::A::B<int, std::A::C<int> >::D<int*>(F, F)",
+		"std::A::E<F<int*>::G&&H<int, std::A::I<int*>::J>::K, void>::L std::A::B<int, std::A::C<int> >::D<int*>(int*, int*)",
 		"std::A::B<int, std::A::C<int> >::D<int*>",
-		"std::A::E::L std::A::B::D(F, F)",
-		"std::A::E<F<int*>::G&&H<int, std::A::I<F>::J>::K, void>::L std::A::B<int, std::A::C<int> >::D<int*>(F, F)",
+		"std::A::E::L std::A::B::D(int*, int*)",
+		"std::A::E<F<int*>::G&&H<int, std::A::I<int*>::J>::K, void>::L std::A::B<int, std::A::C<int> >::D<int*>(int*, int*)",
 		"std::A::B::D",
 	},
 	{
@@ -381,10 +381,10 @@ var demanglerTests = []struct {
 	},
 	{
 		"_ZN1A1B1CIZN1D1E1FINS2_2KVINSt3__u1GIcNS6_1HIcEENS6_1IIcEEEESC_EEEENS_1JERKN1K1L1M1NENS_1OIFvvEEENSL_IFvRKT_EEEPNS6_1PIXsr1Q1R1SISO_EE1TENSH_1TISO_EENSH_1UISO_EEE1VEEUlRKNSH_1WES13_E_vJS13_S13_EEET0_NS0_1XEDpNS0_1YIT1_E1ZE",
-		"void A::B::C<D::E::F<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > >(K::L::M::N const&, A::O<void ()>, A::O<void (D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > const&)>, std::__u::P<Q::R::S<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > >::T, K::L::M::T<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > >, K::L::M::U<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > > >::V*)::{lambda(K::L::M::W const&, K::L::M::W const)#1}, void, K::L::M::W const, K::L::M::W const>(A::B::X, A::B::Y<K::L::M::W const>::Z, A::B::Y<K::L::M::W const>::Z)",
-		"A::B::C<D::E::F<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > >(K::L::M::N const&, A::O<void ()>, A::O<void (D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > const&)>, std::__u::P<Q::R::S<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > >::T, K::L::M::T<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > >, K::L::M::U<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > > >::V*)::{lambda(K::L::M::W const&, K::L::M::W const)#1}, void, K::L::M::W const, K::L::M::W const>",
+		"void A::B::C<D::E::F<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > >(K::L::M::N const&, A::O<void ()>, A::O<void (D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > const&)>, std::__u::P<Q::R::S<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > >::T, K::L::M::T<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > >, K::L::M::U<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > > >::V*)::{lambda(K::L::M::W const&, K::L::M::W const&)#1}, void, K::L::M::W const&, K::L::M::W const&>(A::B::X, A::B::Y<K::L::M::W const&>::Z, A::B::Y<K::L::M::W const&>::Z)",
+		"A::B::C<D::E::F<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > >(K::L::M::N const&, A::O<void ()>, A::O<void (D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > const&)>, std::__u::P<Q::R::S<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > >::T, K::L::M::T<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > >, K::L::M::U<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > > >::V*)::{lambda(K::L::M::W const&, K::L::M::W const&)#1}, void, K::L::M::W const&, K::L::M::W const&>",
 		"void A::B::C(A::B::X, A::B::Y::Z, A::B::Y::Z)",
-		"void A::B::C<D::E::F<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > >()::{lambda(K::L::M::W const&, K::L::M::W const)#1}, void, K::L::M::W const, K::L::M::W const>(A::B::X, A::B::Y<K::L::M::W const>::Z, A::B::Y<K::L::M::W const>::Z)",
+		"void A::B::C<D::E::F<D::KV<std::__u::G<char, std::__u::H<char>, std::__u::I<char> >, std::__u::G<char, std::__u::H<char>, std::__u::I<char> > > >()::{lambda(K::L::M::W const&, K::L::M::W const&)#1}, void, K::L::M::W const&, K::L::M::W const&>(A::B::X, A::B::Y<K::L::M::W const&>::Z, A::B::Y<K::L::M::W const&>::Z)",
 		"A::B::C",
 	},
 	{
@@ -418,6 +418,14 @@ var demanglerTests = []struct {
 		"a throw(long double ( throw(long double [])) [])",
 		"a throw(long double ( throw(long double [])) [])",
 		"a",
+	},
+	{
+		"_ZN2v84base17PrintCheckOperandIiEENSt4__Cr9enable_ifIXaaaantsr3std11is_functionINS2_14remove_pointerIT_E4typeEEE5valuentsr3std7is_enumIS5_EE5valuesr19has_output_operatorIS5_NS0_18CheckMessageStreamEEE5valueENS2_12basic_stringIcNS2_11char_traitsIcEENS2_9allocatorIcEEEEE4typeES5_",
+		"std::__Cr::enable_if<((!std::is_function<std::__Cr::remove_pointer<int>::type>::value)&&(!std::is_enum<int>::value))&&has_output_operator<int, v8::base::CheckMessageStream>::value, std::__Cr::basic_string<char, std::__Cr::char_traits<char>, std::__Cr::allocator<char> > >::type v8::base::PrintCheckOperand<int>(int)",
+		"v8::base::PrintCheckOperand<int>",
+		"std::__Cr::enable_if::type v8::base::PrintCheckOperand(int)",
+		"std::__Cr::enable_if<((!std::is_function<std::__Cr::remove_pointer<int>::type>::value)&&(!std::is_enum<int>::value))&&has_output_operator<int, v8::base::CheckMessageStream>::value, std::__Cr::basic_string<char, std::__Cr::char_traits<char>, std::__Cr::allocator<char> > >::type v8::base::PrintCheckOperand<int>(int)",
+		"v8::base::PrintCheckOperand",
 	},
 }
 
