@@ -244,7 +244,9 @@ func (rst *rustState) path(needsSeparator bool) {
 				fmt.Fprintf(&rst.buf, "#%d}", dis)
 				rst.last = '}'
 			}
-		} else {
+		} else if len(ident) > 0 {
+			// Internal namespaces with an empty name, such as the "c"
+			// namespace of tuple struct and variant constructors, print nothing.
 			rst.writeString("::")
 			rst.writeString(ident)
 		}
@@ -996,9 +998,19 @@ func (rst *rustState) backref(demangle func()) {
 	demangle()
 }
 
+// decimalNumber parses:
+//
+//	<decimal-number> = "0"
+//	                 | <[1-9]> {<[0-9]>}
 func (rst *rustState) decimalNumber() int {
-	if len(rst.str) == 0 {
+	if len(rst.str) == 0 || !isDigit(rst.str[0]) {
 		rst.fail("expected number")
+	}
+
+	// A leading 0 is the whole number, so "00" is two numbers.
+	if rst.str[0] == '0' {
+		rst.advance(1)
+		return 0
 	}
 
 	val := 0
