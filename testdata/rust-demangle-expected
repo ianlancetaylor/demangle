@@ -321,3 +321,21 @@ foo
 --format=rust
 _RNvC9backtrace3foo.llvm.A5310EB9
 backtrace::foo
+#
+# A leading 0 is a complete <decimal-number>, so adjacent empty
+# identifiers ("00") are two identifiers, not one.
+--format=rust
+_RNCNCNCNvNtCs5Lb7a0Vsvng_3std2rt19lang_start_internal00s_0B9_
+std::rt::lang_start_internal::{closure#0}::{closure#0}::{closure#1}
+--format=rust
+_RNCINvNtNtCs5Lb7a0Vsvng_3std6thread7current17with_current_nameNCNCNvNtB8_9panicking12default_hook00uE0B8_
+std::thread::current::with_current_name::<std::panicking::default_hook::{closure#0}::{closure#0}, ()>::{closure#0}
+--format=rust
+_RNvNCNKNvNtNtCsdnanKjkF2cC_3std2io5stdio14OUTPUT_CAPTURE0023___RUST_STD_INTERNAL_VAL
+std::io::stdio::OUTPUT_CAPTURE::{K#0}::{closure#0}::__RUST_STD_INTERNAL_VAL
+#
+# An internal namespace with an empty name, such as the constructor
+# namespace "c", prints nothing.
+--format=rust
+_RINvMsk_NtCsgFX3jaOk65H_5alloc3vecINtB6_3VecNtNtCsgaR7kZaaD1L_12regex_syntax3ast8ClassSetE14extend_trustedINtNtNtNtCskADBYZwJmSU_4core4iter8adapters3map3MapINtNtB6_5drain5DrainNtBI_12ClassSetItemENcNtBG_4Item0EEBK_
+<alloc::vec::Vec<regex_syntax::ast::ClassSet>>::extend_trusted::<core::iter::adapters::map::Map<alloc::vec::drain::Drain<regex_syntax::ast::ClassSetItem>, regex_syntax::ast::ClassSet::Item>>
